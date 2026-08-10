@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sledenje
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: sledenje
+      TIMESCALEDB_TELEMETRY: "off"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sledenje"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  traccar:
+    image: traccar/traccar:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CONFIG_USE_ENVIRONMENT_VARIABLES: "true"
+      DATABASE_DRIVER: org.postgresql.Driver
+      DATABASE_URL: jdbc:postgresql://postgres:5432/traccar
+      DATABASE_USER: sledenje
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/api/health"]
+      interval: 2m
+      timeout: 5s
+      start_period: 1h
+      retries: 3
+    volumes:
+      - traccar_logs:/opt/traccar/logs
+    ports:
+      - "5027:5027" # Teltonika (TCP) - vhod za GPS naprave
+      - "127.0.0.1:8082:8082" # Traccar REST/WebSocket API - lokalni dostop za razvoj/preverjanje
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      traccar:
+        condition: service_started
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: postgresql://sledenje:${POSTGRES_PASSWORD}@postgres:5432/sledenje
+    ports:
+      - "127.0.0.1:3002:3000"
+
+  autoheal:
+    image: willfarrell/autoheal:latest
+    restart: always
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all
+      AUTOHEAL_INTERVAL: 60
+      AUTOHEAL_START_PERIOD: 3600
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+volumes:
+  postgres_data:
+  traccar_logs:

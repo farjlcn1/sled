@@ -1,0 +1,206 @@
+"use server";
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/auth/session";
+
+const stopSettingsSchema = z.object({
+  minStopDurationMin: z.coerce.number().int().min(1).max(180),
+  minMovingSpeedKmh: z.coerce.number().min(1).max(50),
+});
+
+const vehicleSchema = z.object({
+  plate: z.string().trim().min(1, "Vnesi registrsko številko."),
+  brand: z.string().optional(),
+  model: z.string().optional(),
+  year: z.coerce.number().int().optional(),
+  note: z.string().optional(),
+  icon: z.enum(["CAR", "VAN", "TRUCK", "EXCAVATOR", "TRACTOR", "MOTORCYCLE"]).default("CAR"),
+  fuelTankVolumeL: z.coerce.number().positive().optional(),
+  deviceId: z.string().optional(),
+  groupId: z.string().optional(),
+  tenantId: z.string().optional(),
+});
+
+export type VehicleState = { error?: string } | undefined;
+
+export async function createVehicle(_prevState: VehicleState, formData: FormData): Promise<VehicleState> {
+  const user = await requireUser();
+  if (!user.canManageVehicles && !user.canManagePlatform) {
+    return { error: "Nimaš dovoljenja za dodajanje vozil." };
+  }
+
+  const parsed = vehicleSchema.safeParse({
+    plate: formData.get("plate"),
+    brand: formData.get("brand") || undefined,
+    model: formData.get("model") || undefined,
+    year: formData.get("year") || undefined,
+    note: formData.get("note") || undefined,
+    icon: formData.get("icon") || undefined,
+    fuelTankVolumeL: formData.get("fuelTankVolumeL") || undefined,
+    deviceId: formData.get("deviceId") || undefined,
+    groupId: formData.get("groupId") || undefined,
+    tenantId: formData.get("tenantId") || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
+  }
+
+  let tenantId: string;
+  if (user.tenantId) {
+    tenantId = user.tenantId;
+  } else if (user.canManagePlatform && parsed.data.tenantId) {
+    tenantId = parsed.data.tenantId;
+  } else {
+    return { error: "Izberi podjetje." };
+  }
+
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  if (!tenant) return { error: "Podjetje ne obstaja." };
+
+  const vehicleCount = await prisma.vehicle.count({ where: { tenantId } });
+  if (vehicleCount >= tenant.deviceLimit) {
+    return { error: `Dosežena je meja ${tenant.deviceLimit} vozil/naprav za to podjetje.` };
+  }
+
+  if (parsed.data.deviceId) {
+    const device = await prisma.device.findUnique({ where: { id: parsed.data.deviceId } });
+    if (!device || device.tenantId !== tenantId) {
+      return { error: "Izbrana naprava ni na voljo za to podjetje." };
+    }
+  }
+
+  if (parsed.data.groupId) {
+    const group = await prisma.vehicleGroup.findUnique({ where: { id: parsed.data.groupId } });
+    if (!group || group.tenantId !== tenantId) {
+      return { error: "Izbrana skupina ni na voljo za to podjetje." };
+    }
+  }
+
+  const vehicle = await prisma.vehicle.create({
+    data: {
+      tenantId,
+      plate: parsed.data.plate,
+      brand: parsed.data.brand,
+      model: parsed.data.model,
+      year: parsed.data.year,
+      note: parsed.data.note,
+      icon: parsed.data.icon,
+      fuelTankVolumeL: parsed.data.fuelTankVolumeL,
+      deviceId: parsed.data.deviceId,
+    },
+  });
+
+  if (parsed.data.groupId) {
+    await prisma.vehicleGroupMembership.create({ data: { vehicleId: vehicle.id, groupId: parsed.data.groupId } });
+  }
+
+  revalidatePath("/vozila");
+  revalidatePath("/zemljevid");
+}
+
+export async function createVehicleGroup(_prevState: VehicleState, formData: FormData): Promise<VehicleState> {
+  const user = await requireUser();
+  if (!user.canManageVehicles && !user.canManagePlatform) return { error: "Ni dovoljeno." };
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Vnesi ime skupine." };
+
+  const tenantId = user.tenantId || String(formData.get("tenantId") ?? "");
+  if (!tenantId) return { error: "Izberi podjetje." };
+
+  try {
+    await prisma.vehicleGroup.create({ data: { tenantId, name } });
+  } catch {
+    return { error: "Skupina s tem imenom že obstaja." };
+  }
+  revalidatePath("/vozila");
+  revalidatePath("/uporabniki");
+}
+
+export async function toggleGroupVehicle(groupId: string, vehicleId: string, inGroup: boolean) {
+  const user = await requireUser();
+  if (!user.canManageVehicles && !user.canManagePlatform) throw new Error("Ni dovoljeno.");
+
+  if (inGroup) {
+    await prisma.vehicleGroupMembership.create({ data: { groupId, vehicleId } }).catch(() => undefined);
+  } else {
+    await prisma.vehicleGroupMembership.deleteMany({ where: { groupId, vehicleId } });
+  }
+  revalidatePath("/vozila");
+  revalidatePath("/uporabniki");
+}
+
+export type StopSettingsState = { error?: string } | undefined;
+
+export async function updateStopSettings(
+  vehicleId: string,
+  _prevState: StopSettingsState,
+  formData: FormData
+): Promise<StopSettingsState> {
+  const user = await requireUser();
+  if (!user.tenantId) return { error: "Ni dovoljeno." };
+
+  const parsed = stopSettingsSchema.safeParse({
+    minStopDurationMin: formData.get("minStopDurationMin"),
+    minMovingSpeedKmh: formData.get("minMovingSpeedKmh"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
+  }
+
+  await prisma.vehicle.updateMany({
+    where: { id: vehicleId, tenantId: user.tenantId },
+    data: parsed.data,
+  });
+  revalidatePath("/vozila");
+}
+
+// Vklopi zasebni način: zapre morebitno že odprto obdobje (za vsak slučaj) in odpre novo.
+export async function startPrivateMode(vehicleId: string, retentionTier: "BASIC" | "WITH_MILEAGE") {
+  const user = await requireUser();
+  if (!user.tenantId) throw new Error("Ni dovoljeno.");
+
+  const vehicle = await prisma.vehicle.findFirst({ where: { id: vehicleId, tenantId: user.tenantId } });
+  if (!vehicle) throw new Error("Vozilo ne obstaja.");
+
+  await prisma.$transaction([
+    prisma.vehiclePrivacyPeriod.updateMany({
+      where: { vehicleId, endedAt: null },
+      data: { endedAt: new Date() },
+    }),
+    prisma.vehiclePrivacyPeriod.create({
+      data: { vehicleId, retentionTier },
+    }),
+    prisma.vehicle.update({ where: { id: vehicleId }, data: { isPrivateMode: true } }),
+  ]);
+
+  revalidatePath("/vozila");
+}
+
+export async function endPrivateMode(vehicleId: string) {
+  const user = await requireUser();
+  if (!user.tenantId) throw new Error("Ni dovoljeno.");
+
+  const vehicle = await prisma.vehicle.findFirst({ where: { id: vehicleId, tenantId: user.tenantId } });
+  if (!vehicle) throw new Error("Vozilo ne obstaja.");
+
+  await prisma.$transaction([
+    prisma.vehiclePrivacyPeriod.updateMany({
+      where: { vehicleId, endedAt: null },
+      data: { endedAt: new Date() },
+    }),
+    prisma.vehicle.update({ where: { id: vehicleId }, data: { isPrivateMode: false } }),
+  ]);
+
+  revalidatePath("/vozila");
+}
+
+// Kateri živi podatki naj bodo prikazani v podrobnem pogledu vozila — velja za tega uporabnika,
+// ne glede na katero vozilo gleda (shranjeno, ni treba izbirati ob vsaki prijavi).
+export async function updateVisibleVehicleFields(fields: string[]) {
+  const user = await requireUser();
+  await prisma.user.update({ where: { id: user.id }, data: { visibleVehicleFields: fields } });
+  revalidatePath("/zemljevid");
+}

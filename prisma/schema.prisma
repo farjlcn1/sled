@@ -1,0 +1,378 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum DeviceProtocol {
+  TELTONIKA
+  OTHER
+}
+
+enum DriverIdMethod {
+  IBUTTON
+  RFID
+  MANUAL
+}
+
+enum VehicleIconType {
+  CAR
+  VAN
+  TRUCK
+  EXCAVATOR
+  TRACTOR
+  MOTORCYCLE
+}
+
+// SUDO: vse, brez podjetja. UP: eno podjetje, kreira uporabnike, vidi vsa vozila/skupine.
+// U: eno podjetje, brez kreiranja uporabnikov, vidi le dodeljena vozila/skupine.
+// DEMO: eno podjetje, vidi le posamično dodeljena vozila (nikoli cele skupine).
+enum UserLevel {
+  SUDO
+  UP
+  U
+  DEMO
+}
+
+enum PrivacyRetentionTier {
+  BASIC // koordinate in potek vožnje se ne hranijo/prikažejo
+  WITH_MILEAGE // koordinate se ne prikažejo, prevoženi km v obdobju pa se štejejo naprej
+}
+
+// Naprava (IMEI) obstaja neodvisno od vozila/podjetja — administracija jo doda,
+// šele nato jo je mogoče dodeliti vozilu znotraj podjetja.
+model Device {
+  id             String         @id @default(cuid())
+  imei           String         @unique
+  protocol       DeviceProtocol @default(TELTONIKA)
+  brand          String?
+  model          String?
+  serialNumber   String?
+  simNumber      String?
+  note           String?
+  traccarDeviceId Int?          @unique
+  tenantId   String?
+  tenant     Tenant?        @relation(fields: [tenantId], references: [id])
+  vehicle    Vehicle?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@map("devices")
+}
+
+// Podjetje (najemnik). Meja naprav se preverja v aplikacijski logiki ob dodajanju vozila.
+model Tenant {
+  id          String    @id @default(cuid())
+  name        String
+  deviceLimit Int       @default(500)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  users        User[]
+  devices      Device[]
+  vehicles     Vehicle[]
+  drivers      Driver[]
+  vehicleGroups VehicleGroup[]
+  potniNalogi  PotniNalog[]
+  tachoFiles   TachoFile[]
+  subscription Subscription?
+
+  @@map("tenants")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+}
+
+// Paket naročnine — predloga (ime, cena, meja naprav). Podjetje se nanj naveže prek Subscription.
+model SubscriptionPlan {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  priceMonthlyCents  Int
+  deviceLimit       Int
+  description       String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("subscription_plans")
+}
+
+// Trenutna naročnina podjetja — ena aktivna naročnina na podjetje.
+model Subscription {
+  id         String             @id @default(cuid())
+  tenantId   String             @unique
+  tenant     Tenant             @relation(fields: [tenantId], references: [id])
+  planId     String
+  plan       SubscriptionPlan   @relation(fields: [planId], references: [id])
+  status     SubscriptionStatus @default(ACTIVE)
+  startedAt  DateTime           @default(now())
+  canceledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  isActive     Boolean  @default(true)
+
+  // Uporabnik brez tenantId je uporabnik administracije (naše osebje, upravlja vsa podjetja/naprave).
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id])
+
+  // Nivo določa privzete spodnje pravice ob kreiranju (glej UserLevel) — booleani ostajajo
+  // vir resnice za preverjanje dostopa v kodi, level pa je zapisan za prikaz/urejanje.
+  level UserLevel @default(U)
+
+  canManagePlatform Boolean @default(false) // administracija: naprave, podjetja, paketi
+  canManageUsers    Boolean @default(false)
+  canManageVehicles Boolean @default(false)
+  canManageDrivers  Boolean @default(false)
+  canViewReports    Boolean @default(false)
+
+  // Kateri živi podatki naprave naj bodo prikazani v podrobnem pogledu vozila — velja za tega
+  // uporabnika ne glede na katero vozilo gleda, shranjeno da ni treba izbirati ob vsaki prijavi.
+  visibleVehicleFields String[] @default([])
+
+  vehicleAccess      UserVehicleAccess[]
+  vehicleGroupAccess UserVehicleGroupAccess[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Vehicle {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  deviceId String? @unique
+  device   Device? @relation(fields: [deviceId], references: [id])
+
+  plate              String
+  brand              String?
+  model              String?
+  year               Int?
+  note               String?
+  registrationDate   DateTime?
+  nextServiceDate    DateTime?
+
+  icon             VehicleIconType @default(CAR)
+  fuelTankVolumeL  Float?
+
+  isPrivateMode Boolean @default(false)
+
+  // Nastavljivi parametri zaznavanja postankov (razdelek 8 arhitekturnega načrta).
+  minStopDurationMin Int   @default(5)
+  minMovingSpeedKmh  Float @default(5)
+
+  // Ali je vozilo vključeno v urnik prenosa tahografskih (VU) datotek — opomnik, ne samodejen prenos.
+  tachoScheduleEnabled Boolean @default(false)
+
+  currentDriverId String?
+  currentDriver   Driver? @relation("CurrentDriver", fields: [currentDriverId], references: [id])
+
+  groupMemberships VehicleGroupMembership[]
+  userAccess       UserVehicleAccess[]
+  privacyPeriods   VehiclePrivacyPeriod[]
+  potniNalogi      PotniNalog[]
+  tachoFiles       TachoFile[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, plate])
+  @@map("vehicles")
+}
+
+// Obdobje, ko je bilo vozilo v zasebnem načinu — endedAt = null pomeni, da je obdobje še aktivno.
+model VehiclePrivacyPeriod {
+  id            String               @id @default(cuid())
+  vehicleId     String
+  vehicle       Vehicle              @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  startedAt     DateTime             @default(now())
+  endedAt       DateTime?
+  retentionTier PrivacyRetentionTier
+
+  @@index([vehicleId, startedAt])
+  @@map("vehicle_privacy_periods")
+}
+
+model Driver {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  fullName      String
+  phone         String?
+  licenseNumber String?
+
+  idMethod DriverIdMethod @default(RFID)
+  idCode   String? // surova iButton/RFID vrednost (po pretvorbi bajtnega vrstnega reda, kjer je potrebno)
+
+  // Urnik prenosa tahografske kartice voznika — opomnik, ne samodejen prenos.
+  tachoScheduleEnabled     Boolean @default(false)
+  tachoDownloadPeriodDays  Int     @default(28) // EU: kartica voznika največ 28 dni med prenosi
+
+  currentVehicles Vehicle[] @relation("CurrentDriver")
+  potniNalogi     PotniNalog[]
+  tachoFiles      TachoFile[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, idCode])
+  @@map("drivers")
+}
+
+model VehicleGroup {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  name String
+
+  memberships UserVehicleGroupAccess[]
+  vehicles    VehicleGroupMembership[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, name])
+  @@map("vehicle_groups")
+}
+
+model VehicleGroupMembership {
+  vehicleId String
+  vehicle   Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  groupId   String
+  group     VehicleGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([vehicleId, groupId])
+  @@map("vehicle_group_memberships")
+}
+
+// Dostop uporabnika do posameznega vozila (za "samo eno vozilo" scenarij).
+model UserVehicleAccess {
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, vehicleId])
+  @@map("user_vehicle_access")
+}
+
+// Dostop uporabnika do celotne skupine vozil.
+model UserVehicleGroupAccess {
+  userId  String
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupId String
+  group   VehicleGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([userId, groupId])
+  @@map("user_vehicle_group_access")
+}
+
+// Dvostopenjski potek: odredba (planirano, pred potjo) -> zaključek/obračun (dejansko, po vrnitvi).
+enum PotniNalogStatus {
+  ODREJEN
+  V_TEKU
+  ZAKLJUCEN
+  LIKVIDIRAN
+}
+
+// Potni nalog za službeno vozilo (SRS 21 knjigovodska listina). Pri službenem vozilu ni kilometrine —
+// strošek vozila krije podjetje neposredno, zato nalog namesto tega spremlja stanje kilometrskega števca.
+model PotniNalog {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Zaporedna številka znotraj podjetja in leta (npr. "PN-2026-0001") — obvezna za veljavnost listine.
+  number String
+
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  driverId  String?
+  driver    Driver? @relation(fields: [driverId], references: [id])
+
+  status PotniNalogStatus @default(ODREJEN)
+
+  issuedAt     DateTime @default(now())
+  issuedByName String // odredbodajalec: ime in funkcija
+  purpose      String // namen poti — mora biti konkreten, ne le "službena pot"
+
+  plannedFrom        String
+  plannedTo          String
+  plannedVia         String?
+  plannedDepartureAt DateTime
+  plannedReturnAt    DateTime
+
+  actualDepartureAt DateTime?
+  actualReturnAt    DateTime?
+  startOdometerKm   Float?
+  endOdometerKm     Float?
+  actualDistanceKm  Float?
+
+  dailyAllowanceEur Float? // dnevnica (odvisna od trajanja odsotnosti, enaka ne glede na vozilo)
+  otherCostsEur     Float? // cestnina, parkirnina, nočitev, kotizacija ipd.
+  otherCostsNote    String?
+
+  driverSignedAt   DateTime?
+  approverSignedAt DateTime?
+
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, number])
+  @@map("potni_nalogi")
+}
+
+// Ali gre za prenos iz enote v vozilu (VU) ali s kartice voznika.
+enum TachoFileKind {
+  VOZILO
+  VOZNIK
+}
+
+// Naložena tahografska DDD datoteka. Prenos je trenutno ročen (ni žive povezave do naprave) —
+// glej lib/tacho/README oz. dogovor v pogovoru: čaka se na TachoSync API ali protokol od Teltonike.
+model TachoFile {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  kind      TachoFileKind
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+  driverId  String?
+  driver    Driver? @relation(fields: [driverId], references: [id])
+
+  fileName     String
+  fileSize     Int
+  downloadedAt DateTime  @default(now())
+  periodFrom   DateTime?
+  periodTo     DateTime?
+
+  rawData Bytes
+
+  createdAt DateTime @default(now())
+
+  @@map("tacho_files")
+}

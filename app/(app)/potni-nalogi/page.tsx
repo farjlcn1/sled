@@ -73,7 +73,7 @@ export default async function PotniNalogiPage({
               ))}
             </select>
           </div>
-          <button type="submit" className="rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-white">
+          <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">
             Prikaži
           </button>
         </form>

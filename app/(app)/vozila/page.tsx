@@ -1,22 +1,14 @@
 import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { AddVehicleForm } from "./add-vehicle-form";
-
-const ICON_LABELS: Record<string, string> = {
-  CAR: "Osebno vozilo",
-  VAN: "Kombi",
-  TRUCK: "Kamion",
-  EXCAVATOR: "Bager",
-  TRACTOR: "Traktor",
-  MOTORCYCLE: "Motor",
-};
+import { VehiclesTable, type VehicleRow } from "./vehicles-table";
 
 async function loadTenantData(tenantId: string) {
   return Promise.all([
     prisma.vehicle.findMany({
       where: { tenantId },
       orderBy: { plate: "asc" },
-      include: { currentDriver: true, groupMemberships: { include: { group: true } } },
+      include: { currentDriver: true, groupMemberships: { include: { group: true } }, device: true },
     }),
     prisma.device.findMany({ where: { tenantId, vehicle: null }, select: { id: true, imei: true } }),
     prisma.vehicleGroup.findMany({
@@ -53,6 +45,20 @@ export default async function VozilaPage({
 
   const [vehicles, availableDevices, groups] = tenantId ? await loadTenantData(tenantId) : [[], [], []];
 
+  const vehicleRows: VehicleRow[] = vehicles.map((v) => ({
+    id: v.id,
+    plate: v.plate,
+    brand: v.brand,
+    model: v.model,
+    year: v.year,
+    icon: v.icon,
+    fuelTankVolumeL: v.fuelTankVolumeL,
+    note: v.note,
+    deviceId: v.deviceId,
+    driverName: v.currentDriver?.fullName ?? null,
+    groupNames: v.groupMemberships.map((m) => m.group.name),
+  }));
+
   return (
     <div className="space-y-8">
       {isPlatformAdmin && (
@@ -74,7 +80,7 @@ export default async function VozilaPage({
               ))}
             </select>
           </div>
-          <button type="submit" className="rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-white">
+          <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">
             Prikaži
           </button>
         </form>
@@ -85,59 +91,17 @@ export default async function VozilaPage({
       )}
 
       {tenantId && (
-        <>
-          <section className="space-y-4">
-            {isPlatformAdmin && (
-              <AddVehicleForm
-                availableDevices={availableDevices}
-                groups={groups.map((g) => ({ id: g.id, name: g.name }))}
-                tenantId={tenantId}
-              />
-            )}
+        <section className="space-y-4">
+          {isPlatformAdmin && (
+            <AddVehicleForm
+              availableDevices={availableDevices}
+              groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+              tenantId={tenantId}
+            />
+          )}
 
-            <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-800">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Registrska</th>
-                    <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Znamka/model</th>
-                    <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Letnik</th>
-                    <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Ikona</th>
-                    <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Rezervoar (L)</th>
-                    <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Skupina</th>
-                    <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Voznik</th>
-                    <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Komentar</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {vehicles.map((v) => (
-                    <tr key={v.id}>
-                      <td className="px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100">{v.plate}</td>
-                      <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
-                        {[v.brand, v.model].filter(Boolean).join(" ") || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{v.year ?? "—"}</td>
-                      <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{ICON_LABELS[v.icon]}</td>
-                      <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{v.fuelTankVolumeL ?? "—"}</td>
-                      <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
-                        {v.groupMemberships.map((m) => m.group.name).join(", ") || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{v.currentDriver?.fullName ?? "—"}</td>
-                      <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{v.note ?? "—"}</td>
-                    </tr>
-                  ))}
-                  {vehicles.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                        Ni še vozil.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </>
+          <VehiclesTable vehicles={vehicleRows} availableDevices={availableDevices} />
+        </section>
       )}
     </div>
   );

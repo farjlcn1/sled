@@ -100,6 +100,131 @@ export async function createVehicle(_prevState: VehicleState, formData: FormData
   revalidatePath("/zemljevid");
 }
 
+export type UpdateVehicleState = { error?: string; success?: boolean } | undefined;
+
+export async function updateVehicle(
+  vehicleId: string,
+  _prevState: UpdateVehicleState,
+  formData: FormData
+): Promise<UpdateVehicleState> {
+  const user = await requireUser();
+  if (!user.canManageVehicles && !user.canManagePlatform) {
+    return { error: "Nimaš dovoljenja za urejanje vozil." };
+  }
+
+  const existing = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+  if (!existing) return { error: "Vozilo ne obstaja." };
+  if (!user.canManagePlatform && existing.tenantId !== user.tenantId) {
+    return { error: "Ni dovoljeno." };
+  }
+
+  const parsed = vehicleSchema.safeParse({
+    plate: formData.get("plate"),
+    brand: formData.get("brand") || undefined,
+    model: formData.get("model") || undefined,
+    year: formData.get("year") || undefined,
+    note: formData.get("note") || undefined,
+    icon: formData.get("icon") || undefined,
+    fuelTankVolumeL: formData.get("fuelTankVolumeL") || undefined,
+    deviceId: formData.get("deviceId") || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
+  }
+
+  if (parsed.data.deviceId) {
+    const device = await prisma.device.findUnique({ where: { id: parsed.data.deviceId } });
+    if (!device || device.tenantId !== existing.tenantId) {
+      return { error: "Izbrana naprava ni na voljo za to podjetje." };
+    }
+  }
+
+  try {
+    await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: {
+        plate: parsed.data.plate,
+        brand: parsed.data.brand || null,
+        model: parsed.data.model || null,
+        year: parsed.data.year ?? null,
+        note: parsed.data.note || null,
+        icon: parsed.data.icon,
+        fuelTankVolumeL: parsed.data.fuelTankVolumeL ?? null,
+        deviceId: parsed.data.deviceId || null,
+      },
+    });
+  } catch {
+    return { error: "Napaka pri shranjevanju — preveri, da registrska št. in naprava nista že v uporabi." };
+  }
+
+  revalidatePath("/vozila");
+  revalidatePath("/zemljevid");
+  return { success: true };
+}
+
+export type DeleteVehiclesState = { error?: string; deleted?: number; failed?: string[] } | undefined;
+
+export async function deleteVehicles(vehicleIds: string[]): Promise<DeleteVehiclesState> {
+  const user = await requireUser();
+  if (!user.canManageVehicles && !user.canManagePlatform) {
+    return { error: "Nimaš dovoljenja za brisanje vozil." };
+  }
+  if (vehicleIds.length === 0) return { error: "Ni izbranih vozil." };
+
+  const vehicles = await prisma.vehicle.findMany({
+    where: { id: { in: vehicleIds } },
+    select: { id: true, plate: true, tenantId: true },
+  });
+
+  let deleted = 0;
+  const failed: string[] = [];
+
+  for (const v of vehicles) {
+    if (!user.canManagePlatform && v.tenantId !== user.tenantId) {
+      failed.push(`${v.plate} (ni dovoljeno)`);
+      continue;
+    }
+    try {
+      await prisma.vehicle.delete({ where: { id: v.id } });
+      deleted++;
+    } catch {
+      failed.push(`${v.plate} (ima povezane potne naloge ali tahografske datoteke)`);
+    }
+  }
+
+  revalidatePath("/vozila");
+  revalidatePath("/zemljevid");
+  revalidatePath("/skupine");
+  return { deleted, failed: failed.length > 0 ? failed : undefined };
+}
+
+export type SaveMembershipsState = { error?: string } | undefined;
+
+// Skupinska (šele ob kliku na "Shrani") sprememba pripadnosti skupinam — glej GroupsMatrix,
+// ki spremembe do takrat hrani samo lokalno v brskalniku.
+export async function saveGroupMemberships(
+  changes: { groupId: string; vehicleId: string; inGroup: boolean }[]
+): Promise<SaveMembershipsState> {
+  const user = await requireUser();
+  if (!user.canManageVehicles && !user.canManagePlatform) return { error: "Ni dovoljeno." };
+
+  await Promise.all(
+    changes.map((change) =>
+      change.inGroup
+        ? prisma.vehicleGroupMembership
+            .create({ data: { groupId: change.groupId, vehicleId: change.vehicleId } })
+            .catch(() => undefined)
+        : prisma.vehicleGroupMembership.deleteMany({
+            where: { groupId: change.groupId, vehicleId: change.vehicleId },
+          })
+    )
+  );
+
+  revalidatePath("/vozila");
+  revalidatePath("/uporabniki");
+  revalidatePath("/skupine");
+}
+
 export async function createVehicleGroup(_prevState: VehicleState, formData: FormData): Promise<VehicleState> {
   const user = await requireUser();
   if (!user.canManageVehicles && !user.canManagePlatform) return { error: "Ni dovoljeno." };
@@ -114,19 +239,6 @@ export async function createVehicleGroup(_prevState: VehicleState, formData: For
     await prisma.vehicleGroup.create({ data: { tenantId, name } });
   } catch {
     return { error: "Skupina s tem imenom že obstaja." };
-  }
-  revalidatePath("/vozila");
-  revalidatePath("/uporabniki");
-}
-
-export async function toggleGroupVehicle(groupId: string, vehicleId: string, inGroup: boolean) {
-  const user = await requireUser();
-  if (!user.canManageVehicles && !user.canManagePlatform) throw new Error("Ni dovoljeno.");
-
-  if (inGroup) {
-    await prisma.vehicleGroupMembership.create({ data: { groupId, vehicleId } }).catch(() => undefined);
-  } else {
-    await prisma.vehicleGroupMembership.deleteMany({ where: { groupId, vehicleId } });
   }
   revalidatePath("/vozila");
   revalidatePath("/uporabniki");

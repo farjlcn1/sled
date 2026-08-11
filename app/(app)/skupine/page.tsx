@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { AddGroupForm } from "../vozila/add-group-form";
-import { GroupVehicleToggle } from "../vozila/group-vehicle-toggle";
+import { GroupsMatrix } from "./groups-matrix";
 
 async function loadTenantData(tenantId: string) {
   return Promise.all([
@@ -43,6 +43,7 @@ export default async function SkupinePage({
   }
 
   const [vehicles, groups] = tenantId ? await loadTenantData(tenantId) : [[], []];
+  const groupRows = groups.map((g) => ({ id: g.id, name: g.name, memberIds: g.vehicles.map((v) => v.vehicleId) }));
 
   return (
     <div className="space-y-4">
@@ -65,7 +66,7 @@ export default async function SkupinePage({
               ))}
             </select>
           </div>
-          <button type="submit" className="rounded-md bg-gray-700 px-4 py-2 text-sm font-medium text-white">
+          <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">
             Prikaži
           </button>
         </form>
@@ -78,49 +79,7 @@ export default async function SkupinePage({
       {tenantId && (
         <section className="space-y-4">
           <AddGroupForm tenantId={user.tenantId ? undefined : tenantId} />
-
-          <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-800">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Skupina</th>
-                  {vehicles.map((v) => (
-                    <th
-                      key={v.id}
-                      className="px-2 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400"
-                    >
-                      {v.plate}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {groups.map((g) => {
-                  const memberIds = new Set(g.vehicles.map((v) => v.vehicleId));
-                  return (
-                    <tr key={g.id}>
-                      <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{g.name}</td>
-                      {vehicles.map((v) => (
-                        <td key={v.id} className="px-2 py-2 text-center">
-                          <GroupVehicleToggle groupId={g.id} vehicleId={v.id} inGroup={memberIds.has(v.id)} />
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
-                {groups.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={vehicles.length + 1}
-                      className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
-                    >
-                      Ni še skupin vozil.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <GroupsMatrix groups={groupRows} vehicles={vehicles} />
         </section>
       )}
     </div>

@@ -29,6 +29,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+# `prisma/seed.ts` imports from `lib/` (e.g. lib/auth/password.ts) directly, outside the
+# Next.js build's own module tracing, so it needs an explicit copy here.
+COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/generated ./generated
 
 COPY docker-entrypoint.sh ./

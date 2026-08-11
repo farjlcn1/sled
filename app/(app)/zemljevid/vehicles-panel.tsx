@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { VehicleMap, type HistoryRoute } from "@/components/vehicle-map";
 import type { VehicleIcon } from "@/app/api/pozicije/route";
+import type { HistoryRow } from "@/lib/history-data";
+import type { VehicleStatus } from "@/lib/vehicle-status";
 import { VehicleRow } from "./vehicle-row";
+import { VehicleHistoryTable } from "./vehicle-history-table";
 
 export type VehicleListItem = {
   id: string;
@@ -14,16 +18,61 @@ export type VehicleListItem = {
   nextServiceDate: string | null;
 };
 
+export type SelectionData = {
+  vehicleId: string;
+  plate: string;
+  icon: VehicleIcon;
+  brandModel: string;
+  year: number | null;
+  driverName: string | null;
+  registrationDate: string | null;
+  nextServiceDate: string | null;
+  tenantName: string | null;
+  note: string | null;
+  status: VehicleStatus;
+  rows: HistoryRow[];
+  error: string | null;
+  from: string;
+  to: string;
+};
+
+function defaultFrom() {
+  const d = new Date();
+  d.setDate(d.getDate() - 7);
+  return d.toISOString().slice(0, 10);
+}
+
+function defaultTo() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function VehiclesPanel({
   vehicles,
-  selectedVehicleId,
-  historyRoute,
+  selectedVehicleIds = [],
+  isPlatformAdmin,
+  selections,
+  initialVisibleFields,
 }: {
   vehicles: VehicleListItem[];
-  selectedVehicleId?: string;
-  historyRoute?: HistoryRoute | null;
+  selectedVehicleIds?: string[];
+  isPlatformAdmin: boolean;
+  selections: SelectionData[];
+  initialVisibleFields: string[];
 }) {
+  const router = useRouter();
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set());
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; vehicleId: string } | null>(null);
+  const [dialogTarget, setDialogTarget] = useState<{ ids: string[]; label: string } | null>(null);
+  const [pointSelection, setPointSelection] = useState<Record<string, Set<number>>>({});
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    function close() {
+      setContextMenu(null);
+    }
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [contextMenu]);
 
   function toggleChecked(id: string) {
     setCheckedIds((prev) => {
@@ -40,62 +89,243 @@ export function VehiclesPanel({
     setCheckedIds(allChecked ? new Set() : new Set(vehicles.map((v) => v.id)));
   }
 
+  // Vec izbranih (pozelenih) vozil + desni klik na eno od njih -> zgodovina za vsa izbrana.
+  // Desni klik na neizbrano vozilo deluje kot prej -> zgodovina samo za to vozilo.
+  function openHistoryDialog() {
+    if (!contextMenu) return;
+    const { vehicleId } = contextMenu;
+    setContextMenu(null);
+
+    if (checkedIds.has(vehicleId) && checkedIds.size > 1) {
+      setDialogTarget({ ids: Array.from(checkedIds), label: `${checkedIds.size} izbranih vozil` });
+    } else {
+      const vehicle = vehicles.find((v) => v.id === vehicleId);
+      setDialogTarget({ ids: [vehicleId], label: vehicle?.plate ?? vehicleId });
+    }
+  }
+
+  function handleDialogSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!dialogTarget) return;
+    const formData = new FormData(e.currentTarget);
+    const from = formData.get("from") as string;
+    const to = formData.get("to") as string;
+    const ids = dialogTarget.ids;
+    setDialogTarget(null);
+    router.push(`/zemljevid?vozilo=${ids.join(",")}&from=${from}&to=${to}`);
+  }
+
+  const menuIsMulti = contextMenu ? checkedIds.has(contextMenu.vehicleId) && checkedIds.size > 1 : false;
+
+  const historyRoutes: HistoryRoute[] = selections
+    .filter((s) => !s.error && s.rows.length > 0)
+    .map((s) => ({
+      path: s.rows.map((r) => [r.longitude as number, r.latitude as number] as [number, number]),
+      plate: s.plate,
+      icon: s.icon,
+      status: s.status,
+    }));
+
+  // Izbrane vrstice v tabeli zgodovine -> pobarvane tocke/segment na zemljevidu, vedno v kronoloskem
+  // vrstnem redu (ne v trenutnem prikaznem sortiranju tabele), da je pot smiselna ne glede na sort.
+  const highlightPaths: [number, number][][] = selections
+    .map((s) => {
+      const selected = pointSelection[s.vehicleId];
+      if (!selected || selected.size === 0) return [];
+      return Array.from(selected)
+        .map((i) => s.rows[i])
+        .filter((r): r is HistoryRow => Boolean(r))
+        .sort((a, b) => a.fixTime.localeCompare(b.fixTime))
+        .map((r) => [r.longitude as number, r.latitude as number] as [number, number]);
+    })
+    .filter((path) => path.length > 0);
+
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[360px_1fr]">
-      <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-800">
-            <tr>
-              <th className="w-8 px-3 py-2">
-                <div
-                  onClick={toggleAll}
-                  role="checkbox"
-                  aria-checked={allChecked}
-                  aria-label="Izberi vsa vozila na zemljevidu"
-                  title="Izberi/odkljukaj vsa vozila"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      toggleAll();
-                    }
-                  }}
-                  className={
-                    allChecked
-                      ? "h-5 w-5 cursor-pointer rounded border border-green-500 bg-green-200 dark:border-green-500 dark:bg-green-800"
-                      : "h-5 w-5 cursor-pointer rounded border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800"
-                  }
-                />
-              </th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Vozila</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {vehicles.map((v) => (
-              <VehicleRow
-                key={v.id}
-                vehicleId={v.id}
-                plate={v.plate}
-                brandModel={v.brandModel}
-                driverName={v.driverName}
-                nextServiceDate={v.nextServiceDate}
-                isSelected={v.id === selectedVehicleId}
-                checked={checkedIds.has(v.id)}
-                onToggleChecked={() => toggleChecked(v.id)}
-              />
-            ))}
-            {vehicles.length === 0 && (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[360px_1fr]">
+        <div className="relative overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <td colSpan={2} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                  Ni še vozil.
-                </td>
+                <th className="w-8 px-3 py-2">
+                  <div
+                    onClick={toggleAll}
+                    role="checkbox"
+                    aria-checked={allChecked}
+                    aria-label="Izberi vsa vozila na zemljevidu"
+                    title="Izberi/odkljukaj vsa vozila"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggleAll();
+                      }
+                    }}
+                    className={
+                      allChecked
+                        ? "h-5 w-5 cursor-pointer rounded border border-green-500 bg-green-200 dark:border-green-500 dark:bg-green-800"
+                        : "h-5 w-5 cursor-pointer rounded border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800"
+                    }
+                  />
+                </th>
+                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Vozila</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {vehicles.map((v) => (
+                <VehicleRow
+                  key={v.id}
+                  vehicleId={v.id}
+                  plate={v.plate}
+                  brandModel={v.brandModel}
+                  driverName={v.driverName}
+                  nextServiceDate={v.nextServiceDate}
+                  isSelected={selectedVehicleIds.includes(v.id)}
+                  checked={checkedIds.has(v.id)}
+                  onToggleChecked={() => toggleChecked(v.id)}
+                  onContextMenu={(vehicleId, x, y) => setContextMenu({ vehicleId, x, y })}
+                />
+              ))}
+              {vehicles.length === 0 && (
+                <tr>
+                  <td colSpan={2} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                    Ni še vozil.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          {contextMenu && (
+            <div
+              className="fixed z-20 rounded-md border border-gray-300 bg-white py-1 text-sm shadow-lg dark:border-gray-600 dark:bg-gray-800"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="block w-full whitespace-nowrap px-3 py-1.5 text-left text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
+                onClick={openHistoryDialog}
+              >
+                {menuIsMulti ? `Naloži zgodovino za ${checkedIds.size} izbranih vozil` : "Naloži zgodovino"}
+              </button>
+            </div>
+          )}
+
+          {dialogTarget && (
+            <div
+              className="fixed inset-0 z-30 flex items-center justify-center bg-black/30"
+              onClick={() => setDialogTarget(null)}
+            >
+              <form
+                onClick={(e) => e.stopPropagation()}
+                onSubmit={handleDialogSubmit}
+                className="space-y-3 rounded-md border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+              >
+                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Zgodovina — {dialogTarget.label}</h3>
+                <div className="flex gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Od</label>
+                    <input
+                      type="date"
+                      name="from"
+                      defaultValue={defaultFrom()}
+                      required
+                      className="mt-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Do</label>
+                    <input
+                      type="date"
+                      name="to"
+                      defaultValue={defaultTo()}
+                      required
+                      className="mt-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDialogTarget(null)}
+                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                  >
+                    Prekliči
+                  </button>
+                  <button type="submit" className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white">
+                    Naloži
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+
+        <VehicleMap visibleVehicleIds={checkedIds} historyRoutes={historyRoutes} highlightPaths={highlightPaths} />
       </div>
 
-      <VehicleMap visibleVehicleIds={checkedIds} historyRoute={historyRoute} />
+      {selections.map((s) => (
+        <div key={s.vehicleId} className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
+            <div>
+              <span className="text-gray-500 dark:text-gray-400">Registrska: </span>
+              <span className="text-gray-900 dark:text-gray-100">{s.plate}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 dark:text-gray-400">Znamka/model: </span>
+              <span className="text-gray-900 dark:text-gray-100">{s.brandModel}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 dark:text-gray-400">Letnik: </span>
+              <span className="text-gray-900 dark:text-gray-100">{s.year ?? "—"}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 dark:text-gray-400">Voznik: </span>
+              <span className="text-gray-900 dark:text-gray-100">{s.driverName ?? "—"}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 dark:text-gray-400">Datum registracije: </span>
+              <span className="text-gray-900 dark:text-gray-100">
+                {s.registrationDate ? new Date(s.registrationDate).toLocaleDateString("sl-SI") : "—"}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-500 dark:text-gray-400">Naslednji servis: </span>
+              <span className="text-gray-900 dark:text-gray-100">
+                {s.nextServiceDate ? new Date(s.nextServiceDate).toLocaleDateString("sl-SI") : "—"}
+              </span>
+            </div>
+            {isPlatformAdmin && (
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Podjetje: </span>
+                <span className="text-gray-900 dark:text-gray-100">{s.tenantName}</span>
+              </div>
+            )}
+            {s.note && (
+              <div className="col-span-2">
+                <span className="text-gray-500 dark:text-gray-400">Opomba: </span>
+                <span className="text-gray-900 dark:text-gray-100">{s.note}</span>
+              </div>
+            )}
+          </div>
+
+          {s.error ? (
+            <p className="text-sm text-red-600 dark:text-red-400">{s.error}</p>
+          ) : (
+            <VehicleHistoryTable
+              key={`${s.vehicleId}-${s.from}-${s.to}`}
+              rows={s.rows}
+              initialVisibleFields={initialVisibleFields}
+              exportHref={`/api/zemljevid/izvoz?vozilo=${s.vehicleId}&from=${s.from}&to=${s.to}`}
+              selectedIndices={pointSelection[s.vehicleId] ?? new Set()}
+              onSelectedIndicesChange={(next) =>
+                setPointSelection((prev) => ({ ...prev, [s.vehicleId]: next }))
+              }
+            />
+          )}
+        </div>
+      ))}
     </div>
   );
 }

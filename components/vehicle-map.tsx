@@ -59,20 +59,62 @@ function createMarkerElement(icon: VehicleIcon, plate: string, color: string): H
   return el;
 }
 
-const ROUTE_SOURCE_ID = "history-route";
-const ROUTE_LAYER_ID = "history-route-line";
+const LABEL_HALF_W = 55; // ocenjena polovica širine značke+napisa (px)
+const LABEL_HALF_H = 15;
+const DECLUTTER_STEP = 26; // ~višina značke — korak navpičnega razmika pri prekrivanju
+
+// HTML markerji (znacka + stalno viden napis registrske) ne dobijo MapLibrove vgrajene izogibe
+// prekrivanju (ta velja samo za GL "symbol" plasti, ne za poljubne HTML markerje) — zato jih tu
+// rocno razmaknemo navpicno, ce bi se pri trenutnem zoomu prekrivali. Klice se po vsaki
+// posodobitvi pozicij/poti ter po vsakem premiku/zoomu zemljevida.
+function declutterMarkers(map: MapLibreMap, markers: Marker[]) {
+  const placed: { x: number; y: number }[] = [];
+  for (const marker of markers) {
+    const { x, y } = map.project(marker.getLngLat());
+    let offsetY = 0;
+    let attempt = 0;
+    while (
+      attempt < 10 &&
+      placed.some((p) => Math.abs(p.x - x) < LABEL_HALF_W * 2 && Math.abs(p.y - (y + offsetY)) < LABEL_HALF_H * 2)
+    ) {
+      attempt++;
+      const step = Math.ceil(attempt / 2) * DECLUTTER_STEP;
+      offsetY = attempt % 2 === 1 ? step : -step;
+    }
+    marker.setOffset([0, offsetY]);
+    placed.push({ x, y: y + offsetY });
+  }
+}
+
+const ROUTE_SOURCE_PREFIX = "history-route";
+const ROUTE_LAYER_PREFIX = "history-route-line";
+const ROUTE_COLORS = [
+  "#2563eb", "#9333ea", "#0d9488", "#db2777", "#d97706",
+  "#4338ca", "#0891b2", "#e11d48", "#65a30d", "#c026d3",
+];
+
+// Barva za tocke/segmente, izbrane v tabeli zgodovine spodaj — ujema se z bg-amber-* v vrsticah tabele.
+const HIGHLIGHT_COLOR = "#f59e0b";
+const HL_LINE_SOURCE_PREFIX = "highlight-line";
+const HL_LINE_LAYER_PREFIX = "highlight-line-layer";
+const HL_POINTS_SOURCE_PREFIX = "highlight-points";
+const HL_POINTS_LAYER_PREFIX = "highlight-points-layer";
 
 export function VehicleMap({
   visibleVehicleIds,
-  historyRoute,
+  historyRoutes,
+  highlightPaths,
 }: {
   visibleVehicleIds?: Set<string>;
-  historyRoute?: HistoryRoute | null;
+  historyRoutes?: HistoryRoute[];
+  highlightPaths?: [number, number][][];
 } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Map<string, Marker>>(new Map());
-  const historyMarkerRef = useRef<Marker | null>(null);
+  const historyMarkersRef = useRef<Marker[]>([]);
+  const prevRouteCountRef = useRef(0);
+  const prevHighlightCountRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [routeError, setRouteError] = useState<string | null>(null);
   const visibleVehicleIdsRef = useRef(visibleVehicleIds);
@@ -94,7 +136,16 @@ export function VehicleMap({
     });
     mapRef.current = map;
 
+    // Ob vsakem premiku/zoomu se lahko spremenijo zasedena mesta na zaslonu — ponovno razmakni napise.
+    function handleViewChange() {
+      declutterMarkers(map, [...markersRef.current.values(), ...historyMarkersRef.current]);
+    }
+    map.on("moveend", handleViewChange);
+    map.on("zoomend", handleViewChange);
+
     return () => {
+      map.off("moveend", handleViewChange);
+      map.off("zoomend", handleViewChange);
       map.remove();
       mapRef.current = null;
     };
@@ -104,6 +155,10 @@ export function VehicleMap({
   // addSource/addLayer lahko vržeta izjemo, ce slog zemljevida se ni v celoti pripravljen —
   // namesto da bi cakali na kak konkreten dogodek/zastavico (v praksi nezanesljivo v tem
   // okolju), preprosto poskusimo in ob napaki na kratko počakamo ter poskusimo znova (do ~15s).
+  // Riše celotne poti naloženih zgodovin (ena ali vec vozil hkrati, vsaka v svoji barvi) + ikono
+  // vozila z registrsko na najnovejši poziciji vsake. addSource/addLayer lahko vržeta izjemo, ce
+  // slog zemljevida se ni v celoti pripravljen — namesto da bi cakali na kak konkreten dogodek,
+  // preprosto poskusimo in ob napaki na kratko počakamo ter poskusimo znova (do ~15s).
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -111,56 +166,130 @@ export function VehicleMap({
     let attempts = 0;
     setRouteError(null);
 
-    function applyRoute() {
+    function applyRoutes() {
       if (!map) return;
-      if (map.getLayer(ROUTE_LAYER_ID)) map.removeLayer(ROUTE_LAYER_ID);
-      if (map.getSource(ROUTE_SOURCE_ID)) map.removeSource(ROUTE_SOURCE_ID);
-      historyMarkerRef.current?.remove();
-      historyMarkerRef.current = null;
+      for (let i = 0; i < prevRouteCountRef.current; i++) {
+        const layerId = `${ROUTE_LAYER_PREFIX}-${i}`;
+        const sourceId = `${ROUTE_SOURCE_PREFIX}-${i}`;
+        if (map.getLayer(layerId)) map.removeLayer(layerId);
+        if (map.getSource(sourceId)) map.removeSource(sourceId);
+      }
+      historyMarkersRef.current.forEach((m) => m.remove());
+      historyMarkersRef.current = [];
 
-      if (!historyRoute || historyRoute.path.length === 0) return;
+      const routes = (historyRoutes ?? []).filter((r) => r.path.length > 0);
+      prevRouteCountRef.current = routes.length;
 
-      if (historyRoute.path.length > 1) {
-        map.addSource(ROUTE_SOURCE_ID, {
+      let bounds: LngLatBounds | null = null;
+
+      routes.forEach((route, i) => {
+        const color = ROUTE_COLORS[i % ROUTE_COLORS.length];
+
+        if (route.path.length > 1) {
+          const sourceId = `${ROUTE_SOURCE_PREFIX}-${i}`;
+          const layerId = `${ROUTE_LAYER_PREFIX}-${i}`;
+          map.addSource(sourceId, {
+            type: "geojson",
+            data: {
+              type: "Feature",
+              properties: {},
+              geometry: { type: "LineString", coordinates: route.path },
+            },
+          });
+          map.addLayer({
+            id: layerId,
+            type: "line",
+            source: sourceId,
+            layout: { "line-join": "round", "line-cap": "round" },
+            paint: { "line-color": color, "line-width": 4, "line-opacity": 0.75 },
+          });
+        }
+
+        const lastPoint = route.path[route.path.length - 1];
+        const marker = new Marker({
+          element: createMarkerElement(route.icon, route.plate, STATUS_COLOR[route.status]),
+        })
+          .setLngLat(lastPoint)
+          .addTo(map);
+        historyMarkersRef.current.push(marker);
+
+        for (const coord of route.path) {
+          bounds = bounds ? bounds.extend(coord) : new LngLatBounds(coord, coord);
+        }
+      });
+
+      declutterMarkers(map, [...markersRef.current.values(), ...historyMarkersRef.current]);
+
+      if (bounds) map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 300 });
+
+      // Izbrane vrstice v tabeli zgodovine spodaj — narisano nad vsem ostalim, ne vpliva na fitBounds
+      // (izbira vrstice naj ne premika/zoomira zemljevida).
+      for (let i = 0; i < prevHighlightCountRef.current; i++) {
+        const lineLayer = `${HL_LINE_LAYER_PREFIX}-${i}`;
+        const lineSource = `${HL_LINE_SOURCE_PREFIX}-${i}`;
+        const pointLayer = `${HL_POINTS_LAYER_PREFIX}-${i}`;
+        const pointSource = `${HL_POINTS_SOURCE_PREFIX}-${i}`;
+        if (map.getLayer(lineLayer)) map.removeLayer(lineLayer);
+        if (map.getSource(lineSource)) map.removeSource(lineSource);
+        if (map.getLayer(pointLayer)) map.removeLayer(pointLayer);
+        if (map.getSource(pointSource)) map.removeSource(pointSource);
+      }
+      const paths = (highlightPaths ?? []).filter((p) => p.length > 0);
+      prevHighlightCountRef.current = paths.length;
+
+      paths.forEach((path, i) => {
+        const pointSource = `${HL_POINTS_SOURCE_PREFIX}-${i}`;
+        const pointLayer = `${HL_POINTS_LAYER_PREFIX}-${i}`;
+        map.addSource(pointSource, {
           type: "geojson",
           data: {
-            type: "Feature",
-            properties: {},
-            geometry: { type: "LineString", coordinates: historyRoute.path },
+            type: "FeatureCollection",
+            features: path.map((coord) => ({
+              type: "Feature",
+              properties: {},
+              geometry: { type: "Point", coordinates: coord },
+            })),
           },
         });
         map.addLayer({
-          id: ROUTE_LAYER_ID,
-          type: "line",
-          source: ROUTE_SOURCE_ID,
-          layout: { "line-join": "round", "line-cap": "round" },
-          paint: { "line-color": "#2563eb", "line-width": 4, "line-opacity": 0.75 },
+          id: pointLayer,
+          type: "circle",
+          source: pointSource,
+          paint: {
+            "circle-radius": 6,
+            "circle-color": HIGHLIGHT_COLOR,
+            "circle-stroke-width": 2,
+            "circle-stroke-color": "#ffffff",
+          },
         });
-      }
 
-      const lastPoint = historyRoute.path[historyRoute.path.length - 1];
-      historyMarkerRef.current = new Marker({
-        element: createMarkerElement(historyRoute.icon, historyRoute.plate, STATUS_COLOR[historyRoute.status]),
-      })
-        .setLngLat(lastPoint)
-        .addTo(map);
-
-      const bounds = historyRoute.path.reduce(
-        (b, coord) => b.extend(coord),
-        new LngLatBounds(historyRoute.path[0], historyRoute.path[0])
-      );
-      map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 300 });
+        if (path.length > 1) {
+          const lineSource = `${HL_LINE_SOURCE_PREFIX}-${i}`;
+          const lineLayer = `${HL_LINE_LAYER_PREFIX}-${i}`;
+          map.addSource(lineSource, {
+            type: "geojson",
+            data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: path } },
+          });
+          map.addLayer({
+            id: lineLayer,
+            type: "line",
+            source: lineSource,
+            layout: { "line-join": "round", "line-cap": "round" },
+            paint: { "line-color": HIGHLIGHT_COLOR, "line-width": 5, "line-opacity": 0.9 },
+          });
+        }
+      });
     }
 
     function tryApply() {
       if (cancelled) return;
       try {
-        applyRoute();
+        applyRoutes();
       } catch {
         if (attempts < MAX_APPLY_ATTEMPTS) {
           attempts++;
           setTimeout(tryApply, APPLY_RETRY_MS);
-        } else if (historyRoute) {
+        } else if ((historyRoutes && historyRoutes.length > 0) || (highlightPaths && highlightPaths.length > 0)) {
           setRouteError("Poti ni bilo mogoče izrisati (zemljevid se ni pripravil pravočasno). Poskusi znova.");
         }
       }
@@ -170,7 +299,7 @@ export function VehicleMap({
     return () => {
       cancelled = true;
     };
-  }, [historyRoute]);
+  }, [historyRoutes, highlightPaths]);
 
   useEffect(() => {
     let cancelled = false;
@@ -224,6 +353,8 @@ export function VehicleMap({
           markersRef.current.delete(vehicleId);
         }
       }
+
+      declutterMarkers(map, [...markersRef.current.values(), ...historyMarkersRef.current]);
     }
 
     poll();

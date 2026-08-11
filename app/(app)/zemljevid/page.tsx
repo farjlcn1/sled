@@ -1,8 +1,7 @@
 import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { vehicleWhereForUser } from "@/lib/vehicle-access";
-import { VehiclesPanel } from "./vehicles-panel";
-import { VehicleHistoryTable } from "./vehicle-history-table";
+import { VehiclesPanel, type SelectionData } from "./vehicles-panel";
 import { computeHistoryRows, endOfDay, type HistoryRow } from "@/lib/history-data";
 import { deriveVehicleStatus, type VehicleStatus } from "@/lib/vehicle-status";
 
@@ -13,7 +12,8 @@ export default async function ZemljevidPage({
 }) {
   const user = await requireUser();
   const isPlatformAdmin = user.canManagePlatform;
-  const { vozilo: selectedVehicleId, from, to } = await searchParams;
+  const { vozilo, from, to } = await searchParams;
+  const selectedVehicleIds = vozilo ? vozilo.split(",").filter(Boolean) : [];
 
   const vehicles = await prisma.vehicle.findMany({
     where: vehicleWhereForUser(user),
@@ -21,109 +21,64 @@ export default async function ZemljevidPage({
     include: { device: true, currentDriver: true, tenant: true },
   });
 
-  const selectedVehicle = selectedVehicleId ? vehicles.find((v) => v.id === selectedVehicleId) : undefined;
+  const selectedVehicles = vehicles.filter((v) => selectedVehicleIds.includes(v.id));
 
-  let historyRows: HistoryRow[] = [];
-  let historyError: string | null = null;
-  let lastStatus: VehicleStatus = "unknown";
+  type Selection = {
+    vehicle: (typeof vehicles)[number];
+    rows: HistoryRow[];
+    error: string | null;
+    status: VehicleStatus;
+  };
 
-  if (selectedVehicle && from && to) {
-    if (!selectedVehicle.device?.traccarDeviceId) {
-      historyError = "Izbrano vozilo nima povezane naprave.";
-    } else {
-      const fromDate = new Date(from);
-      const toDate = endOfDay(to);
-      historyRows = await computeHistoryRows(selectedVehicle, fromDate, toDate);
+  let selections: Selection[] = [];
+  if (selectedVehicles.length > 0 && from && to) {
+    const fromDate = new Date(from);
+    const toDate = endOfDay(to);
 
-      const lastRow = historyRows[historyRows.length - 1];
-      if (lastRow) lastStatus = deriveVehicleStatus(lastRow);
-    }
+    selections = await Promise.all(
+      selectedVehicles.map(async (vehicle): Promise<Selection> => {
+        if (!vehicle.device?.traccarDeviceId) {
+          return { vehicle, rows: [], error: "Vozilo nima povezane naprave.", status: "unknown" };
+        }
+        const rows = await computeHistoryRows(vehicle, fromDate, toDate);
+        const lastRow = rows[rows.length - 1];
+        return { vehicle, rows, error: null, status: lastRow ? deriveVehicleStatus(lastRow) : "unknown" };
+      })
+    );
   }
 
-  const historyRoute =
-    !historyError && historyRows.length > 0 && selectedVehicle
-      ? {
-          path: historyRows.map((r) => [r.longitude as number, r.latitude as number] as [number, number]),
-          plate: selectedVehicle.plate,
-          icon: selectedVehicle.icon,
-          status: lastStatus,
-        }
-      : null;
+  const selectionData: SelectionData[] = selections.map((s) => ({
+    vehicleId: s.vehicle.id,
+    plate: s.vehicle.plate,
+    icon: s.vehicle.icon,
+    brandModel: [s.vehicle.brand, s.vehicle.model].filter(Boolean).join(" ") || "—",
+    year: s.vehicle.year,
+    driverName: s.vehicle.currentDriver?.fullName ?? null,
+    registrationDate: s.vehicle.registrationDate?.toISOString() ?? null,
+    nextServiceDate: s.vehicle.nextServiceDate?.toISOString() ?? null,
+    tenantName: s.vehicle.tenant.name,
+    note: s.vehicle.note,
+    status: s.status,
+    rows: s.rows,
+    error: s.error,
+    from: from ?? "",
+    to: to ?? "",
+  }));
 
   return (
-    <div className="space-y-6">
-      <VehiclesPanel
-        vehicles={vehicles.map((v) => ({
-          id: v.id,
-          plate: v.plate,
-          brandModel: [v.brand, v.model].filter(Boolean).join(" ") || "—",
-          driverName: v.currentDriver?.fullName ?? null,
-          icon: v.icon,
-          nextServiceDate: v.nextServiceDate?.toISOString() ?? null,
-        }))}
-        selectedVehicleId={selectedVehicleId}
-        historyRoute={historyRoute}
-      />
-
-      {selectedVehicle && from && to && (
-        <div className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Registrska: </span>
-              <span className="text-gray-900 dark:text-gray-100">{selectedVehicle.plate}</span>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Znamka/model: </span>
-              <span className="text-gray-900 dark:text-gray-100">
-                {[selectedVehicle.brand, selectedVehicle.model].filter(Boolean).join(" ") || "—"}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Letnik: </span>
-              <span className="text-gray-900 dark:text-gray-100">{selectedVehicle.year ?? "—"}</span>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Voznik: </span>
-              <span className="text-gray-900 dark:text-gray-100">{selectedVehicle.currentDriver?.fullName ?? "—"}</span>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Datum registracije: </span>
-              <span className="text-gray-900 dark:text-gray-100">
-                {selectedVehicle.registrationDate ? new Date(selectedVehicle.registrationDate).toLocaleDateString("sl-SI") : "—"}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Naslednji servis: </span>
-              <span className="text-gray-900 dark:text-gray-100">
-                {selectedVehicle.nextServiceDate ? new Date(selectedVehicle.nextServiceDate).toLocaleDateString("sl-SI") : "—"}
-              </span>
-            </div>
-            {isPlatformAdmin && (
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Podjetje: </span>
-                <span className="text-gray-900 dark:text-gray-100">{selectedVehicle.tenant.name}</span>
-              </div>
-            )}
-            {selectedVehicle.note && (
-              <div className="col-span-2">
-                <span className="text-gray-500 dark:text-gray-400">Opomba: </span>
-                <span className="text-gray-900 dark:text-gray-100">{selectedVehicle.note}</span>
-              </div>
-            )}
-          </div>
-
-          {historyError ? (
-            <p className="text-sm text-red-600 dark:text-red-400">{historyError}</p>
-          ) : (
-            <VehicleHistoryTable
-              key={`${selectedVehicle.id}-${from}-${to}`}
-              rows={historyRows}
-              initialVisibleFields={user.visibleVehicleFields}
-              exportHref={`/api/zemljevid/izvoz?vozilo=${selectedVehicle.id}&from=${from}&to=${to}`}
-            />
-          )}
-        </div>
-      )}
-    </div>
+    <VehiclesPanel
+      vehicles={vehicles.map((v) => ({
+        id: v.id,
+        plate: v.plate,
+        brandModel: [v.brand, v.model].filter(Boolean).join(" ") || "—",
+        driverName: v.currentDriver?.fullName ?? null,
+        icon: v.icon,
+        nextServiceDate: v.nextServiceDate?.toISOString() ?? null,
+      }))}
+      selectedVehicleIds={selectedVehicleIds}
+      isPlatformAdmin={isPlatformAdmin}
+      selections={selectionData}
+      initialVisibleFields={user.visibleVehicleFields}
+    />
   );
 }

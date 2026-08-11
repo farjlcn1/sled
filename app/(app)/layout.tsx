@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth/session";
 import { LogoutButton } from "@/components/logout-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { NavLinks } from "@/components/nav-links";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="font-semibold text-gray-900 dark:text-gray-100">Sledenje</span>
             <div className="flex items-center gap-3">
               <span className="hidden text-sm text-gray-700 dark:text-gray-300 sm:inline">{user.fullName}</span>
+              <ThemeToggle />
               <LogoutButton />
             </div>
           </div>

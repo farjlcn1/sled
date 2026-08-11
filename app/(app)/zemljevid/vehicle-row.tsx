@@ -1,18 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import type { VehicleQuickStatus } from "@/app/api/vozila/[id]/status/route";
-
-function defaultFrom() {
-  const d = new Date();
-  d.setDate(d.getDate() - 7);
-  return d.toISOString().slice(0, 10);
-}
-
-function defaultTo() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;
@@ -37,6 +26,7 @@ export function VehicleRow({
   isSelected,
   checked,
   onToggleChecked,
+  onContextMenu,
 }: {
   vehicleId: string;
   plate: string;
@@ -46,22 +36,11 @@ export function VehicleRow({
   isSelected: boolean;
   checked: boolean;
   onToggleChecked: () => void;
+  onContextMenu: (vehicleId: string, x: number, y: number) => void;
 }) {
-  const router = useRouter();
-  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<VehicleQuickStatus | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!menuPos) return;
-    function close() {
-      setMenuPos(null);
-    }
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, [menuPos]);
 
   useEffect(() => {
     if (!expanded) return;
@@ -84,16 +63,7 @@ export function VehicleRow({
 
   function handleContextMenu(e: React.MouseEvent) {
     e.preventDefault();
-    setMenuPos({ x: e.clientX, y: e.clientY });
-  }
-
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const from = formData.get("from") as string;
-    const to = formData.get("to") as string;
-    setDialogOpen(false);
-    router.push(`/zemljevid?vozilo=${vehicleId}&from=${from}&to=${to}`);
+    onContextMenu(vehicleId, e.clientX, e.clientY);
   }
 
   return (
@@ -128,74 +98,6 @@ export function VehicleRow({
             {driverName && <span className="font-normal text-gray-500 dark:text-gray-400"> ({driverName})</span>}
           </span>
           <div className="text-xs text-gray-500 dark:text-gray-400">{brandModel}</div>
-
-          {menuPos && (
-            <div
-              className="fixed z-20 rounded-md border border-gray-300 bg-white py-1 text-sm shadow-lg dark:border-gray-600 dark:bg-gray-800"
-              style={{ left: menuPos.x, top: menuPos.y }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                className="block w-full whitespace-nowrap px-3 py-1.5 text-left text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
-                onClick={() => {
-                  setMenuPos(null);
-                  setDialogOpen(true);
-                }}
-              >
-                Naloži zgodovino
-              </button>
-            </div>
-          )}
-
-          {dialogOpen && (
-            <div
-              className="fixed inset-0 z-30 flex items-center justify-center bg-black/30"
-              onClick={() => setDialogOpen(false)}
-            >
-              <form
-                onClick={(e) => e.stopPropagation()}
-                onSubmit={handleSubmit}
-                className="space-y-3 rounded-md border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-900"
-              >
-                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Zgodovina — {plate}</h3>
-                <div className="flex gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Od</label>
-                    <input
-                      type="date"
-                      name="from"
-                      defaultValue={defaultFrom()}
-                      required
-                      className="mt-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Do</label>
-                    <input
-                      type="date"
-                      name="to"
-                      defaultValue={defaultTo()}
-                      required
-                      className="mt-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDialogOpen(false)}
-                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
-                  >
-                    Prekliči
-                  </button>
-                  <button type="submit" className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white">
-                    Naloži
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
         </td>
       </tr>
       {expanded && (

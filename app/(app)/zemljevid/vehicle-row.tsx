@@ -102,118 +102,38 @@ export function VehicleRow({
           .filter(Boolean)
           .join(" ")}
       >
-        <div
-          onClick={onToggleChecked}
-          role="checkbox"
-          aria-checked={checked}
-          aria-label={`Prikaži ${plate} na zemljevidu`}
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onToggleChecked();
-            }
-          }}
-          className="cursor-pointer"
-        >
-          <span
-            className={
-              expanded
-                ? "text-base font-bold text-blue-700 dark:text-blue-400"
-                : "font-medium text-gray-900 dark:text-gray-100"
-            }
-          >
-            {plate}
-            {driverName && <span className="font-normal text-gray-500 dark:text-gray-400"> ({driverName})</span>}
-          </span>
+        <div className="flex items-start justify-between gap-3">
           <div
-            className={expanded ? "text-sm text-blue-600 dark:text-blue-400" : "text-xs text-gray-500 dark:text-gray-400"}
+            onClick={onToggleChecked}
+            role="checkbox"
+            aria-checked={checked}
+            aria-label={`Prikaži ${plate} na zemljevidu`}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onToggleChecked();
+              }
+            }}
+            className="cursor-pointer"
           >
-            {brandModel}
-          </div>
-        </div>
-
-        {expanded && (
-          <div className="mt-2 flex items-start justify-between gap-3">
-            <div className="space-y-1 text-xs">
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Registrska: </span>
-                <span className="text-gray-900 dark:text-gray-100">{plate}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Znamka/model: </span>
-                <span className="text-gray-900 dark:text-gray-100">{brandModel}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Letnik: </span>
-                <span className="text-gray-900 dark:text-gray-100">{year ?? "—"}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Voznik: </span>
-                <span className="text-gray-900 dark:text-gray-100">{driverName ?? "—"}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Datum registracije: </span>
-                <span className="text-gray-900 dark:text-gray-100">{fmtDate(registrationDate)}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Naslednji servis: </span>
-                <span className="text-gray-900 dark:text-gray-100">{fmtDate(nextServiceDate)}</span>
-              </div>
-              {isPlatformAdmin && (
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Podjetje: </span>
-                  <span className="text-gray-900 dark:text-gray-100">{tenantName}</span>
-                </div>
-              )}
-              {note && (
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Opomba: </span>
-                  <span className="text-gray-900 dark:text-gray-100">{note}</span>
-                </div>
-              )}
-
-              {detailError && <p className="text-red-600 dark:text-red-400">{detailError}</p>}
-              {!detail && !detailError && <p className="text-gray-500 dark:text-gray-400">Nalagam …</p>}
-              {detail && (
-                <>
-                  <div>
-                    <span className="text-gray-500 dark:text-gray-400">Zadnja pozicija: </span>
-                    <span className="text-gray-900 dark:text-gray-100">
-                      {new Date(detail.fixTime).toLocaleString("sl-SI", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 dark:text-gray-400">{STATUS_LABEL[detail.status]}</span>
-                    <span className="text-gray-900 dark:text-gray-100">
-                      {formatDuration(detail.stateDurationMin)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 dark:text-gray-400">Ignition: </span>
-                    <span className="text-gray-900 dark:text-gray-100">
-                      {detail.ignition === null ? "—" : detail.ignition ? "Da" : "Ne"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 dark:text-gray-400">Odometer: </span>
-                    <span className="text-gray-900 dark:text-gray-100">{detail.odometer ?? "—"}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 dark:text-gray-400">Gorivo: </span>
-                    <span className="text-gray-900 dark:text-gray-100">
-                      {detail.fuel != null ? `${detail.fuel}%` : "—"}
-                    </span>
-                  </div>
-                </>
-              )}
+            <span
+              className={
+                expanded
+                  ? "text-base font-bold text-blue-700 dark:text-blue-400"
+                  : "font-medium text-gray-900 dark:text-gray-100"
+              }
+            >
+              {plate}
+              {driverName && <span className="font-normal text-gray-500 dark:text-gray-400"> ({driverName})</span>}
+            </span>
+            <div
+              className={expanded ? "text-sm text-blue-600 dark:text-blue-400" : "text-xs text-gray-500 dark:text-gray-400"}
+            >
+              {brandModel}
             </div>
-
+          </div>
+          {expanded && (
             <button
               type="button"
               onClick={() => onLoadHistory(vehicleId, plate)}
@@ -221,6 +141,77 @@ export function VehicleRow({
             >
               Naloži zgodovino
             </button>
+          )}
+        </div>
+
+        {expanded && (
+          <div className="mt-2 space-y-1 text-xs">
+            <div>
+              <span className="text-gray-500 dark:text-gray-400">Letnik: </span>
+              <span className="text-gray-900 dark:text-gray-100">{year ?? "—"}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 dark:text-gray-400">Voznik: </span>
+              <span className="text-gray-900 dark:text-gray-100">{driverName ?? "—"}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 dark:text-gray-400">Datum registracije: </span>
+              <span className="text-gray-900 dark:text-gray-100">{fmtDate(registrationDate)}</span>
+            </div>
+            <div>
+              <span className="text-gray-500 dark:text-gray-400">Naslednji servis: </span>
+              <span className="text-gray-900 dark:text-gray-100">{fmtDate(nextServiceDate)}</span>
+            </div>
+            {isPlatformAdmin && (
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Podjetje: </span>
+                <span className="text-gray-900 dark:text-gray-100">{tenantName}</span>
+              </div>
+            )}
+            {note && (
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Opomba: </span>
+                <span className="text-gray-900 dark:text-gray-100">{note}</span>
+              </div>
+            )}
+
+            {detailError && <p className="text-red-600 dark:text-red-400">{detailError}</p>}
+            {!detail && !detailError && <p className="text-gray-500 dark:text-gray-400">Nalagam …</p>}
+            {detail && (
+              <>
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Zadnja pozicija: </span>
+                  <span className="text-gray-900 dark:text-gray-100">
+                    {new Date(detail.fixTime).toLocaleString("sl-SI", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">{STATUS_LABEL[detail.status]}</span>
+                  <span className="text-gray-900 dark:text-gray-100">{formatDuration(detail.stateDurationMin)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Ignition: </span>
+                  <span className="text-gray-900 dark:text-gray-100">
+                    {detail.ignition === null ? "—" : detail.ignition ? "Da" : "Ne"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Odometer: </span>
+                  <span className="text-gray-900 dark:text-gray-100">{detail.odometer ?? "—"}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Gorivo: </span>
+                  <span className="text-gray-900 dark:text-gray-100">
+                    {detail.fuel != null ? `${detail.fuel}%` : "—"}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         )}
       </td>

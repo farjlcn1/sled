@@ -70,9 +70,11 @@ function compare(a: string | number, b: string | number): number {
 export function VehiclesTable({
   vehicles,
   availableDevices,
+  canBulkDelete,
 }: {
   vehicles: VehicleRow[];
   availableDevices: { id: string; imei: string }[];
+  canBulkDelete: boolean;
 }) {
   const [sort, setSort] = useState<{ key: ColumnKey; dir: SortDir } | null>(null);
   const [checked, setChecked] = useState<Set<string>>(() => new Set());
@@ -141,28 +143,32 @@ export function VehiclesTable({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={handleDeleteClick}
-          disabled={checked.size === 0 || isPending}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {isPending ? "Brišem …" : "Izbriši vozilo"}
-        </button>
-        {checked.size > 0 && (
-          <span className="text-sm text-gray-500 dark:text-gray-400">Izbranih: {checked.size}</span>
-        )}
-        {deleteMessage && <span className="text-sm text-gray-700 dark:text-gray-300">{deleteMessage}</span>}
-      </div>
+      {canBulkDelete && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleDeleteClick}
+            disabled={checked.size === 0 || isPending}
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {isPending ? "Brišem …" : "Izbriši vozilo"}
+          </button>
+          {checked.size > 0 && (
+            <span className="text-sm text-gray-500 dark:text-gray-400">Izbranih: {checked.size}</span>
+          )}
+          {deleteMessage && <span className="text-sm text-gray-700 dark:text-gray-300">{deleteMessage}</span>}
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>
-              <th className="w-8 px-3 py-2">
-                <input type="checkbox" checked={allChecked} onChange={toggleAll} aria-label="Odkljukaj vse" />
-              </th>
+              {canBulkDelete && (
+                <th className="w-8 px-3 py-2">
+                  <input type="checkbox" checked={allChecked} onChange={toggleAll} aria-label="Odkljukaj vse" />
+                </th>
+              )}
               {COLUMNS.map((col) => (
                 <th
                   key={col.key}
@@ -179,9 +185,11 @@ export function VehiclesTable({
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
             {sortedVehicles.map((v) => (
               <tr key={v.id}>
-                <td className="px-3 py-2">
-                  <input type="checkbox" checked={checked.has(v.id)} onChange={() => toggleOne(v.id)} />
-                </td>
+                {canBulkDelete && (
+                  <td className="px-3 py-2">
+                    <input type="checkbox" checked={checked.has(v.id)} onChange={() => toggleOne(v.id)} />
+                  </td>
+                )}
                 <td className="px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100">{v.plate}</td>
                 <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
                   {[v.brand, v.model].filter(Boolean).join(" ") || "—"}
@@ -207,7 +215,10 @@ export function VehiclesTable({
             ))}
             {vehicles.length === 0 && (
               <tr>
-                <td colSpan={COLUMNS.length + 2} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                <td
+                  colSpan={COLUMNS.length + 1 + (canBulkDelete ? 1 : 0)}
+                  className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
+                >
                   Ni še vozil.
                 </td>
               </tr>

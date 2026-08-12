@@ -100,7 +100,7 @@ export default async function VozilaPage({
             />
           )}
 
-          <VehiclesTable vehicles={vehicleRows} availableDevices={availableDevices} />
+          <VehiclesTable vehicles={vehicleRows} availableDevices={availableDevices} canBulkDelete={user.canManagePlatform} />
         </section>
       )}
     </div>

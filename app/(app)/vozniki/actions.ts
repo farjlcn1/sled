@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requirePermission, requirePlatformAdmin } from "@/lib/auth/session";
+import { requirePermission, requirePlatformAdmin, requireUser } from "@/lib/auth/session";
 import { parseXlsxRows, findColumn } from "@/lib/xlsx-import";
 
 const driverSchema = z.object({
@@ -17,9 +17,17 @@ const driverSchema = z.object({
 export type DriverState = { error?: string } | undefined;
 
 export async function createDriver(_prevState: DriverState, formData: FormData): Promise<DriverState> {
-  const user = await requirePermission("canManageDrivers");
+  const user = await requireUser();
+  if (!user.canManageDrivers && !user.canManagePlatform) {
+    return { error: "Nimaš dovoljenja za dodajanje voznikov." };
+  }
+
+  const tenantId = user.tenantId || String(formData.get("tenantId") ?? "");
+  if (!tenantId) return { error: "Izberi podjetje." };
+
   if (!user.tenantId) {
-    return { error: "Uporabnik brez podjetja ne more dodajati voznikov." };
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) return { error: "Podjetje ne obstaja." };
   }
 
   const parsed = driverSchema.safeParse({
@@ -36,7 +44,7 @@ export async function createDriver(_prevState: DriverState, formData: FormData):
   try {
     await prisma.driver.create({
       data: {
-        tenantId: user.tenantId,
+        tenantId,
         fullName: parsed.data.fullName,
         phone: parsed.data.phone,
         licenseNumber: parsed.data.licenseNumber,
@@ -49,6 +57,86 @@ export async function createDriver(_prevState: DriverState, formData: FormData):
   }
 
   revalidatePath("/vozniki");
+}
+
+export type UpdateDriverState = { error?: string; success?: boolean } | undefined;
+
+export async function updateDriver(
+  driverId: string,
+  _prevState: UpdateDriverState,
+  formData: FormData
+): Promise<UpdateDriverState> {
+  const user = await requireUser();
+  if (!user.canManageDrivers && !user.canManagePlatform) {
+    return { error: "Nimaš dovoljenja za urejanje voznikov." };
+  }
+
+  const existing = await prisma.driver.findUnique({ where: { id: driverId } });
+  if (!existing) return { error: "Voznik ne obstaja." };
+  if (!user.canManagePlatform && existing.tenantId !== user.tenantId) {
+    return { error: "Ni dovoljeno." };
+  }
+
+  const parsed = driverSchema.safeParse({
+    fullName: formData.get("fullName"),
+    phone: formData.get("phone") || undefined,
+    licenseNumber: formData.get("licenseNumber") || undefined,
+    idMethod: formData.get("idMethod") || "RFID",
+    idCode: formData.get("idCode") || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
+  }
+
+  try {
+    await prisma.driver.update({
+      where: { id: driverId },
+      data: {
+        fullName: parsed.data.fullName,
+        phone: parsed.data.phone || null,
+        licenseNumber: parsed.data.licenseNumber || null,
+        idMethod: parsed.data.idMethod,
+        idCode: parsed.data.idCode || null,
+      },
+    });
+  } catch {
+    return { error: "Voznik s to ID kodo že obstaja." };
+  }
+
+  revalidatePath("/vozniki");
+  return { success: true };
+}
+
+export type DeleteDriversState = { error?: string; deleted?: number; failed?: string[] } | undefined;
+
+export async function deleteDrivers(driverIds: string[]): Promise<DeleteDriversState> {
+  const user = await requireUser();
+  if (!user.canManagePlatform) {
+    return { error: "Množično brisanje voznikov je na voljo samo administratorju." };
+  }
+  if (driverIds.length === 0) return { error: "Ni izbranih voznikov." };
+
+  const drivers = await prisma.driver.findMany({
+    where: { id: { in: driverIds } },
+    select: { id: true, fullName: true },
+  });
+
+  let deleted = 0;
+  const failed: string[] = [];
+
+  for (const d of drivers) {
+    try {
+      await prisma.driver.delete({ where: { id: d.id } });
+      deleted++;
+    } catch {
+      failed.push(d.fullName);
+    }
+  }
+
+  revalidatePath("/vozniki");
+  revalidatePath("/vozila");
+  revalidatePath("/zemljevid");
+  return { deleted, failed: failed.length > 0 ? failed : undefined };
 }
 
 export async function assignDriverToVehicle(driverId: string, vehicleId: string) {

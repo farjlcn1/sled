@@ -166,24 +166,20 @@ export type DeleteVehiclesState = { error?: string; deleted?: number; failed?: s
 
 export async function deleteVehicles(vehicleIds: string[]): Promise<DeleteVehiclesState> {
   const user = await requireUser();
-  if (!user.canManageVehicles && !user.canManagePlatform) {
-    return { error: "Nimaš dovoljenja za brisanje vozil." };
+  if (!user.canManagePlatform) {
+    return { error: "Množično brisanje vozil je na voljo samo administratorju." };
   }
   if (vehicleIds.length === 0) return { error: "Ni izbranih vozil." };
 
   const vehicles = await prisma.vehicle.findMany({
     where: { id: { in: vehicleIds } },
-    select: { id: true, plate: true, tenantId: true },
+    select: { id: true, plate: true },
   });
 
   let deleted = 0;
   const failed: string[] = [];
 
   for (const v of vehicles) {
-    if (!user.canManagePlatform && v.tenantId !== user.tenantId) {
-      failed.push(`${v.plate} (ni dovoljeno)`);
-      continue;
-    }
     try {
       await prisma.vehicle.delete({ where: { id: v.id } });
       deleted++;

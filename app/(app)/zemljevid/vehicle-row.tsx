@@ -83,18 +83,26 @@ export function VehicleRow({
   }
 
   return (
-    <>
-      <tr
-        onContextMenu={handleContextMenu}
-        onDoubleClick={() => setExpanded((v) => !v)}
-        onMouseDown={(e) => {
-          if (e.detail > 1) e.preventDefault();
-        }}
-        title="Klik za prikaz na zemljevidu, desni klik za zgodovino vožnje, dvoklik za podatke o vozilu"
-        className={isSelected ? "bg-blue-50 dark:bg-blue-950" : undefined}
+    <tr
+      onContextMenu={handleContextMenu}
+      onDoubleClick={() => setExpanded((v) => !v)}
+      onMouseDown={(e) => {
+        if (e.detail > 1) e.preventDefault();
+      }}
+      title="Klik za prikaz na zemljevidu, desni klik za zgodovino vožnje, dvoklik za podatke o vozilu"
+      className={isSelected ? "bg-blue-50 dark:bg-blue-950" : undefined}
+    >
+      <td
+        colSpan={2}
+        className={[
+          "px-3 py-2 text-sm",
+          checked ? "bg-green-100 dark:bg-green-900" : expanded ? "bg-blue-50/60 dark:bg-blue-950/40" : "",
+          expanded ? "border-l-4 border-blue-500 dark:border-blue-400" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
-        <td
-          colSpan={2}
+        <div
           onClick={onToggleChecked}
           role="checkbox"
           aria-checked={checked}
@@ -106,119 +114,116 @@ export function VehicleRow({
               onToggleChecked();
             }
           }}
-          className={[
-            "cursor-pointer px-3 py-2 text-sm",
-            checked ? "bg-green-100 dark:bg-green-900" : expanded ? "bg-blue-50/60 dark:bg-blue-950/40" : "",
-            expanded ? "border-l-4 border-blue-500 dark:border-blue-400" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+          className="cursor-pointer"
         >
           <span
             className={
-              expanded ? "font-bold text-blue-700 dark:text-blue-400" : "font-medium text-gray-900 dark:text-gray-100"
+              expanded
+                ? "text-base font-bold text-blue-700 dark:text-blue-400"
+                : "font-medium text-gray-900 dark:text-gray-100"
             }
           >
             {plate}
             {driverName && <span className="font-normal text-gray-500 dark:text-gray-400"> ({driverName})</span>}
           </span>
-          <div className="text-xs text-gray-500 dark:text-gray-400">{brandModel}</div>
-        </td>
-      </tr>
-      {expanded && (
-        <tr>
-          <td colSpan={2} className="border-l-4 border-blue-500 bg-blue-50/60 px-3 py-2 dark:border-blue-400 dark:bg-blue-950/40">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1 text-xs">
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Registrska: </span>
-                  <span className="text-gray-900 dark:text-gray-100">{plate}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Znamka/model: </span>
-                  <span className="text-gray-900 dark:text-gray-100">{brandModel}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Letnik: </span>
-                  <span className="text-gray-900 dark:text-gray-100">{year ?? "—"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Voznik: </span>
-                  <span className="text-gray-900 dark:text-gray-100">{driverName ?? "—"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Datum registracije: </span>
-                  <span className="text-gray-900 dark:text-gray-100">{fmtDate(registrationDate)}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Naslednji servis: </span>
-                  <span className="text-gray-900 dark:text-gray-100">{fmtDate(nextServiceDate)}</span>
-                </div>
-                {isPlatformAdmin && (
-                  <div>
-                    <span className="text-gray-500 dark:text-gray-400">Podjetje: </span>
-                    <span className="text-gray-900 dark:text-gray-100">{tenantName}</span>
-                  </div>
-                )}
-                {note && (
-                  <div>
-                    <span className="text-gray-500 dark:text-gray-400">Opomba: </span>
-                    <span className="text-gray-900 dark:text-gray-100">{note}</span>
-                  </div>
-                )}
+          <div
+            className={expanded ? "text-sm text-blue-600 dark:text-blue-400" : "text-xs text-gray-500 dark:text-gray-400"}
+          >
+            {brandModel}
+          </div>
+        </div>
 
-                {detailError && <p className="text-red-600 dark:text-red-400">{detailError}</p>}
-                {!detail && !detailError && <p className="text-gray-500 dark:text-gray-400">Nalagam …</p>}
-                {detail && (
-                  <>
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Zadnja pozicija: </span>
-                      <span className="text-gray-900 dark:text-gray-100">
-                        {new Date(detail.fixTime).toLocaleString("sl-SI", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">{STATUS_LABEL[detail.status]}</span>
-                      <span className="text-gray-900 dark:text-gray-100">
-                        {formatDuration(detail.stateDurationMin)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Ignition: </span>
-                      <span className="text-gray-900 dark:text-gray-100">
-                        {detail.ignition === null ? "—" : detail.ignition ? "Da" : "Ne"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Odometer: </span>
-                      <span className="text-gray-900 dark:text-gray-100">{detail.odometer ?? "—"}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 dark:text-gray-400">Gorivo: </span>
-                      <span className="text-gray-900 dark:text-gray-100">
-                        {detail.fuel != null ? `${detail.fuel}%` : "—"}
-                      </span>
-                    </div>
-                  </>
-                )}
+        {expanded && (
+          <div className="mt-2 flex items-start justify-between gap-3">
+            <div className="space-y-1 text-xs">
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Registrska: </span>
+                <span className="text-gray-900 dark:text-gray-100">{plate}</span>
               </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Znamka/model: </span>
+                <span className="text-gray-900 dark:text-gray-100">{brandModel}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Letnik: </span>
+                <span className="text-gray-900 dark:text-gray-100">{year ?? "—"}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Voznik: </span>
+                <span className="text-gray-900 dark:text-gray-100">{driverName ?? "—"}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Datum registracije: </span>
+                <span className="text-gray-900 dark:text-gray-100">{fmtDate(registrationDate)}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Naslednji servis: </span>
+                <span className="text-gray-900 dark:text-gray-100">{fmtDate(nextServiceDate)}</span>
+              </div>
+              {isPlatformAdmin && (
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Podjetje: </span>
+                  <span className="text-gray-900 dark:text-gray-100">{tenantName}</span>
+                </div>
+              )}
+              {note && (
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Opomba: </span>
+                  <span className="text-gray-900 dark:text-gray-100">{note}</span>
+                </div>
+              )}
 
-              <button
-                type="button"
-                onClick={() => onLoadHistory(vehicleId, plate)}
-                className="shrink-0 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white"
-              >
-                Naloži zgodovino
-              </button>
+              {detailError && <p className="text-red-600 dark:text-red-400">{detailError}</p>}
+              {!detail && !detailError && <p className="text-gray-500 dark:text-gray-400">Nalagam …</p>}
+              {detail && (
+                <>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Zadnja pozicija: </span>
+                    <span className="text-gray-900 dark:text-gray-100">
+                      {new Date(detail.fixTime).toLocaleString("sl-SI", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">{STATUS_LABEL[detail.status]}</span>
+                    <span className="text-gray-900 dark:text-gray-100">
+                      {formatDuration(detail.stateDurationMin)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Ignition: </span>
+                    <span className="text-gray-900 dark:text-gray-100">
+                      {detail.ignition === null ? "—" : detail.ignition ? "Da" : "Ne"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Odometer: </span>
+                    <span className="text-gray-900 dark:text-gray-100">{detail.odometer ?? "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Gorivo: </span>
+                    <span className="text-gray-900 dark:text-gray-100">
+                      {detail.fuel != null ? `${detail.fuel}%` : "—"}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
-          </td>
-        </tr>
-      )}
-    </>
+
+            <button
+              type="button"
+              onClick={() => onLoadHistory(vehicleId, plate)}
+              className="shrink-0 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white"
+            >
+              Naloži zgodovino
+            </button>
+          </div>
+        )}
+      </td>
+    </tr>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createPotniNalog } from "./actions";
+import { AddressCombobox } from "./address-combobox";
 
 const inputClass =
   "mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
@@ -14,6 +15,9 @@ export function NalogForm({
   drivers: { id: string; fullName: string }[];
 }) {
   const [open, setOpen] = useState(false);
+  const [plannedFrom, setPlannedFrom] = useState("");
+  const [plannedTo, setPlannedTo] = useState("");
+  const [plannedVia, setPlannedVia] = useState("");
   const [state, formAction, pending] = useActionState(createPotniNalog, undefined);
 
   if (!open) {
@@ -65,15 +69,15 @@ export function NalogForm({
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Kraj odhoda</label>
-          <input name="plannedFrom" required className={inputClass} />
+          <AddressCombobox name="plannedFrom" value={plannedFrom} onChange={setPlannedFrom} required className={inputClass} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cilj</label>
-          <input name="plannedTo" required className={inputClass} />
+          <AddressCombobox name="plannedTo" value={plannedTo} onChange={setPlannedTo} required className={inputClass} />
         </div>
         <div className="sm:col-span-2">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Vmesne postaje (neobvezno)</label>
-          <input name="plannedVia" className={inputClass} />
+          <AddressCombobox name="plannedVia" value={plannedVia} onChange={setPlannedVia} className={inputClass} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Planiran odhod</label>

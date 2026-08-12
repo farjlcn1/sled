@@ -17,26 +17,42 @@ const STATUS_LABEL: Record<VehicleQuickStatus["status"], string> = {
   unknown: "Čas v trenutnem stanju: ",
 };
 
+function fmtDate(iso: string | null) {
+  return iso ? new Date(iso).toLocaleDateString("sl-SI") : "—";
+}
+
 export function VehicleRow({
   vehicleId,
   plate,
   brandModel,
   driverName,
+  year,
+  registrationDate,
   nextServiceDate,
+  note,
+  tenantName,
+  isPlatformAdmin,
   isSelected,
   checked,
   onToggleChecked,
   onContextMenu,
+  onLoadHistory,
 }: {
   vehicleId: string;
   plate: string;
   brandModel: string;
   driverName: string | null;
+  year: number | null;
+  registrationDate: string | null;
   nextServiceDate: string | null;
+  note: string | null;
+  tenantName: string | null;
+  isPlatformAdmin: boolean;
   isSelected: boolean;
   checked: boolean;
   onToggleChecked: () => void;
   onContextMenu: (vehicleId: string, x: number, y: number) => void;
+  onLoadHistory: (vehicleId: string, label: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<VehicleQuickStatus | null>(null);
@@ -71,7 +87,7 @@ export function VehicleRow({
       <tr
         onContextMenu={handleContextMenu}
         onDoubleClick={() => setExpanded((v) => !v)}
-        title="Klik za prikaz na zemljevidu, desni klik za zgodovino vožnje, dvoklik za hitre podatke"
+        title="Klik za prikaz na zemljevidu, desni klik za zgodovino vožnje, dvoklik za podatke o vozilu"
         className={isSelected ? "bg-blue-50 dark:bg-blue-950" : undefined}
       >
         <td
@@ -102,46 +118,95 @@ export function VehicleRow({
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={2} className="bg-gray-50 px-3 py-2 text-xs dark:bg-gray-800">
-            {detailError && <p className="text-red-600 dark:text-red-400">{detailError}</p>}
-            {!detail && !detailError && <p className="text-gray-500 dark:text-gray-400">Nalagam …</p>}
-            {detail && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+          <td colSpan={2} className="bg-gray-50 px-3 py-2 dark:bg-gray-800">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1 text-xs">
                 <div>
-                  <span className="text-gray-500 dark:text-gray-400">Zadnja pozicija: </span>
-                  {new Date(detail.fixTime).toLocaleString("sl-SI", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">{STATUS_LABEL[detail.status]}</span>
-                  {formatDuration(detail.stateDurationMin)}
+                  <span className="text-gray-500 dark:text-gray-400">Registrska: </span>
+                  <span className="text-gray-900 dark:text-gray-100">{plate}</span>
                 </div>
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">Znamka/model: </span>
-                  {brandModel}
+                  <span className="text-gray-900 dark:text-gray-100">{brandModel}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 dark:text-gray-400">Ignition: </span>
-                  {detail.ignition === null ? "—" : detail.ignition ? "Da" : "Ne"}
+                  <span className="text-gray-500 dark:text-gray-400">Letnik: </span>
+                  <span className="text-gray-900 dark:text-gray-100">{year ?? "—"}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 dark:text-gray-400">Odometer: </span>
-                  {detail.odometer ?? "—"}
+                  <span className="text-gray-500 dark:text-gray-400">Voznik: </span>
+                  <span className="text-gray-900 dark:text-gray-100">{driverName ?? "—"}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 dark:text-gray-400">Gorivo: </span>
-                  {detail.fuel != null ? `${detail.fuel}%` : "—"}
+                  <span className="text-gray-500 dark:text-gray-400">Datum registracije: </span>
+                  <span className="text-gray-900 dark:text-gray-100">{fmtDate(registrationDate)}</span>
                 </div>
                 <div>
                   <span className="text-gray-500 dark:text-gray-400">Naslednji servis: </span>
-                  {nextServiceDate ? new Date(nextServiceDate).toLocaleDateString("sl-SI") : "—"}
+                  <span className="text-gray-900 dark:text-gray-100">{fmtDate(nextServiceDate)}</span>
                 </div>
+                {isPlatformAdmin && (
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Podjetje: </span>
+                    <span className="text-gray-900 dark:text-gray-100">{tenantName}</span>
+                  </div>
+                )}
+                {note && (
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Opomba: </span>
+                    <span className="text-gray-900 dark:text-gray-100">{note}</span>
+                  </div>
+                )}
+
+                {detailError && <p className="text-red-600 dark:text-red-400">{detailError}</p>}
+                {!detail && !detailError && <p className="text-gray-500 dark:text-gray-400">Nalagam …</p>}
+                {detail && (
+                  <>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Zadnja pozicija: </span>
+                      <span className="text-gray-900 dark:text-gray-100">
+                        {new Date(detail.fixTime).toLocaleString("sl-SI", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">{STATUS_LABEL[detail.status]}</span>
+                      <span className="text-gray-900 dark:text-gray-100">
+                        {formatDuration(detail.stateDurationMin)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Ignition: </span>
+                      <span className="text-gray-900 dark:text-gray-100">
+                        {detail.ignition === null ? "—" : detail.ignition ? "Da" : "Ne"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Odometer: </span>
+                      <span className="text-gray-900 dark:text-gray-100">{detail.odometer ?? "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Gorivo: </span>
+                      <span className="text-gray-900 dark:text-gray-100">
+                        {detail.fuel != null ? `${detail.fuel}%` : "—"}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
-            )}
+
+              <button
+                type="button"
+                onClick={() => onLoadHistory(vehicleId, plate)}
+                className="shrink-0 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white"
+              >
+                Naloži zgodovino
+              </button>
+            </div>
           </td>
         </tr>
       )}

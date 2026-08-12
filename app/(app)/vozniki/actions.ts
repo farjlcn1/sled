@@ -11,7 +11,7 @@ const driverSchema = z.object({
   phone: z.string().optional(),
   licenseNumber: z.string().optional(),
   idMethod: z.enum(["IBUTTON", "RFID", "MANUAL"]).default("RFID"),
-  idCode: z.string().optional(),
+  idCode: z.string().trim().min(1, "Vnesi ID kodo."),
 });
 
 export type DriverState = { error?: string } | undefined;

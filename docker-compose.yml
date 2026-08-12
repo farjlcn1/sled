@@ -40,6 +40,20 @@ services:
       - "5027:5027" # Teltonika (TCP) - vhod za GPS naprave
       - "127.0.0.1:8082:8082" # Traccar REST/WebSocket API - lokalni dostop za razvoj/preverjanje
 
+  # Iskanje naslovov za potne naloge (samostojen geokoder, brez zunanjega API-ja).
+  # jsonl način je edini, ki podpira Slovenijo (samo 16 večjih drzav ima vnaprej zgrajen "db" indeks) —
+  # ob prvem zagonu prenese in zgradi indeks za SLO, kar lahko traja dlje; brez healthcheck-a namenoma,
+  # da ga "autoheal" ne prekine sredi tega prvega uvoza.
+  photon:
+    image: rtuszik/photon-docker:latest
+    restart: unless-stopped
+    environment:
+      IMPORT_MODE: jsonl
+      REGION: slovenia
+      LANGUAGES: sl
+    volumes:
+      - photon_data:/photon/data
+
   app:
     build: .
     restart: unless-stopped
@@ -48,10 +62,13 @@ services:
         condition: service_healthy
       traccar:
         condition: service_started
+      photon:
+        condition: service_started
     env_file:
       - .env.production
     environment:
       DATABASE_URL: postgresql://sledenje:${POSTGRES_PASSWORD}@postgres:5432/sledenje
+      PHOTON_URL: http://photon:2322
     ports:
       - "127.0.0.1:3002:3000"
 
@@ -68,3 +85,4 @@ services:
 volumes:
   postgres_data:
   traccar_logs:
+  photon_data:

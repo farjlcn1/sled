@@ -78,7 +78,7 @@ export function EditVehicleForm({
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Letnik
-            <input name="year" type="number" defaultValue={vehicle.year ?? ""} className={fieldClass()} />
+            <input name="year" type="number" defaultValue={vehicle.year ?? ""} className={`${fieldClass()} no-spinner`} />
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Volumen rezervoarja (L)
@@ -88,7 +88,7 @@ export function EditVehicleForm({
               step="0.1"
               min="0"
               defaultValue={vehicle.fuelTankVolumeL ?? ""}
-              className={fieldClass()}
+              className={`${fieldClass()} no-spinner`}
             />
           </label>
           <label className="col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300">

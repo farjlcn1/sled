@@ -1,23 +1,36 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
-import { updateDriver } from "./actions";
+import { updateDevice } from "./actions";
 
-export type EditableDriver = {
+export const PROTOCOL_OPTIONS: { value: string; label: string }[] = [
+  { value: "TELTONIKA", label: "Teltonika" },
+  { value: "OTHER", label: "Drugo" },
+];
+
+export type EditableDevice = {
   id: string;
-  fullName: string;
-  phone: string | null;
-  licenseNumber: string | null;
-  idMethod: string;
-  idCode: string | null;
+  imei: string;
+  brand: string | null;
+  model: string | null;
+  serialNumber: string | null;
+  simNumber: string | null;
+  note: string | null;
+  protocol: string;
 };
 
 function fieldClass() {
   return "mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 }
 
-export function EditDriverForm({ driver, onClose }: { driver: EditableDriver; onClose: () => void }) {
-  const boundUpdate = updateDriver.bind(null, driver.id);
+export function EditDeviceForm({
+  device,
+  onClose,
+}: {
+  device: EditableDevice;
+  onClose: () => void;
+}) {
+  const boundUpdate = updateDevice.bind(null, device.id);
   const [state, formAction, pending] = useActionState(boundUpdate, undefined);
 
   useEffect(() => {
@@ -31,32 +44,38 @@ export function EditDriverForm({ driver, onClose }: { driver: EditableDriver; on
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-lg space-y-3 rounded-md border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-900"
       >
-        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Uredi voznika — {driver.fullName}</h3>
+        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Uredi napravo — {device.imei}</h3>
 
         <div className="grid grid-cols-2 gap-3">
-          <label className="col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Ime in priimek
-            <input name="fullName" defaultValue={driver.fullName} required className={fieldClass()} />
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Znamka
+            <input name="brand" defaultValue={device.brand ?? ""} className={fieldClass()} />
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Telefon
-            <input name="phone" defaultValue={driver.phone ?? ""} className={fieldClass()} />
+            Model
+            <input name="model" defaultValue={device.model ?? ""} className={fieldClass()} />
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Št. vozniškega dovoljenja
-            <input name="licenseNumber" defaultValue={driver.licenseNumber ?? ""} className={fieldClass()} />
+            Serijska št.
+            <input name="serialNumber" defaultValue={device.serialNumber ?? ""} className={fieldClass()} />
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Način ID
-            <select name="idMethod" defaultValue={driver.idMethod} className={fieldClass()}>
-              <option value="RFID">RFID</option>
-              <option value="IBUTTON">iButton</option>
-              <option value="MANUAL">Ročno</option>
+            SIM
+            <input name="simNumber" defaultValue={device.simNumber ?? ""} className={fieldClass()} />
+          </label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Protokol
+            <select name="protocol" defaultValue={device.protocol} className={fieldClass()}>
+              {PROTOCOL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           </label>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            ID koda (RFID/iButton)
-            <input name="idCode" defaultValue={driver.idCode ?? ""} required placeholder="npr. RFID/iButton koda" className={fieldClass()} />
+          <label className="col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Opomba
+            <input name="note" defaultValue={device.note ?? ""} className={fieldClass()} />
           </label>
         </div>
 

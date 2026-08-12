@@ -15,11 +15,18 @@ export default async function ZemljevidPage({
   const { vozilo, from, to } = await searchParams;
   const selectedVehicleIds = vozilo ? vozilo.split(",").filter(Boolean) : [];
 
-  const vehicles = await prisma.vehicle.findMany({
-    where: vehicleWhereForUser(user),
-    orderBy: { plate: "asc" },
-    include: { device: true, currentDriver: true, tenant: true },
-  });
+  const [vehicles, groups] = await Promise.all([
+    prisma.vehicle.findMany({
+      where: vehicleWhereForUser(user),
+      orderBy: { plate: "asc" },
+      include: { device: true, currentDriver: true, tenant: true },
+    }),
+    prisma.vehicleGroup.findMany({
+      where: user.tenantId ? { tenantId: user.tenantId } : {},
+      orderBy: { name: "asc" },
+      include: { vehicles: { select: { vehicleId: true } } },
+    }),
+  ]);
 
   const selectedVehicles = vehicles.filter((v) => selectedVehicleIds.includes(v.id));
 
@@ -73,7 +80,16 @@ export default async function ZemljevidPage({
         brandModel: [v.brand, v.model].filter(Boolean).join(" ") || "—",
         driverName: v.currentDriver?.fullName ?? null,
         icon: v.icon,
+        year: v.year,
+        registrationDate: v.registrationDate?.toISOString() ?? null,
         nextServiceDate: v.nextServiceDate?.toISOString() ?? null,
+        note: v.note,
+        tenantName: v.tenant.name,
+      }))}
+      groups={groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        vehicleIds: g.vehicles.map((m) => m.vehicleId),
       }))}
       selectedVehicleIds={selectedVehicleIds}
       isPlatformAdmin={isPlatformAdmin}

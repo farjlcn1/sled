@@ -11,20 +11,11 @@ import {
   type ReportType,
 } from "@/lib/report-types";
 import { ReportForm } from "./report-form";
-
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
-
-function fmtTimeSec(iso: string) {
-  return new Date(iso).toLocaleString("sl-SI", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
+import { VoznjeTable } from "./voznje-table";
+import { PostankiTable } from "./postanki-table";
+import { FuelDropsTable, FuelReadingsTable } from "./gorivo-tables";
+import { OverspeedTable, TripSpeedsTable } from "./hitrost-tables";
+import { VseTable } from "./vse-table";
 
 function Tile({ label, value }: { label: string; value: string }) {
   return (
@@ -55,37 +46,7 @@ function VoznjeSection({ report }: { report: VehicleReportResult & { ok: true } 
         <Tile label="Čas vožnje" value={`${Math.round(report.summary.totalDrivingMin / 60)} h`} />
         <Tile label="Št. voženj" value={String(report.summary.trips.length)} />
       </div>
-      <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-800">
-            <tr>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Začetek</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Konec</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Trajanje</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Razdalja</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Najv. hitrost</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {report.summary.trips.map((t, i) => (
-              <tr key={i}>
-                <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{fmtTime(t.startTime)}</td>
-                <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{fmtTime(t.endTime)}</td>
-                <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{Math.round(t.durationMin)} min</td>
-                <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{t.distanceKm.toFixed(1)} km</td>
-                <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{Math.round(t.maxSpeedKmh)} km/h</td>
-              </tr>
-            ))}
-            {report.summary.trips.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                  Ni voženj v izbranem obdobju.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <VoznjeTable trips={report.summary.trips} />
     </>
   );
 }
@@ -97,35 +58,7 @@ function PostankiSection({ report }: { report: VehicleReportResult & { ok: true 
         <Tile label="Št. postankov" value={String(report.summary.stops.length)} />
         <Tile label="Čas postankov" value={`${Math.round(report.summary.totalStoppedMin / 60)} h`} />
       </div>
-      <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-800">
-            <tr>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Začetek</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Konec</th>
-              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Trajanje</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {report.summary.stops.map((s, i) => (
-              <tr key={i}>
-                <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{fmtTime(s.startTime)}</td>
-                <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{fmtTime(s.endTime)}</td>
-                <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
-                  {s.durationMin >= 60 ? `${(s.durationMin / 60).toFixed(1)} h` : `${Math.round(s.durationMin)} min`}
-                </td>
-              </tr>
-            ))}
-            {report.summary.stops.length === 0 && (
-              <tr>
-                <td colSpan={3} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                  Ni postankov v izbranem obdobju.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <PostankiTable stops={report.summary.stops} />
     </>
   );
 }
@@ -148,60 +81,13 @@ function GorivoSection({ report }: { report: VehicleReportResult & { ok: true } 
           <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
             Padec goriva ≥ 8 % v manj kot 30 minutah — možen znak iztoka ali napake senzorja, ne nujno tatvine.
           </p>
-          <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-800">
-                <tr>
-                  <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Od</th>
-                  <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Do</th>
-                  <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Sprememba</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {fuel.drops.map((d, i) => (
-                  <tr key={i}>
-                    <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
-                      {fmtTimeSec(d.fromTime)} ({d.fromPct} %)
-                    </td>
-                    <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
-                      {fmtTimeSec(d.toTime)} ({d.toPct} %)
-                    </td>
-                    <td className="px-3 py-2 text-sm text-red-600 dark:text-red-400">-{d.deltaPct} %</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <FuelDropsTable drops={fuel.drops} />
         </div>
       )}
 
       <div>
         <h3 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Meritve goriva ({fuel.readings.length})</h3>
-        <div className="max-h-96 overflow-auto rounded-md border border-gray-200 dark:border-gray-700">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Čas</th>
-                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Gorivo</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {fuel.readings.map((r, i) => (
-                <tr key={i}>
-                  <td className="px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">{fmtTimeSec(r.time)}</td>
-                  <td className="px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">{r.fuelPct} %</td>
-                </tr>
-              ))}
-              {fuel.readings.length === 0 && (
-                <tr>
-                  <td colSpan={2} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                    Naprava ne pošilja podatkov o gorivu.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <FuelReadingsTable readings={fuel.readings} />
       </div>
     </>
   );
@@ -241,58 +127,13 @@ function HitrostSection({ report }: { report: VehicleReportResult & { ok: true }
           <h3 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
             Prekoračitve hitrosti ({speed.overspeedEvents.length})
           </h3>
-          <div className="max-h-72 overflow-auto rounded-md border border-gray-200 dark:border-gray-700">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800">
-                <tr>
-                  <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Čas</th>
-                  <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Hitrost</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {speed.overspeedEvents.map((e, i) => (
-                  <tr key={i}>
-                    <td className="px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">{fmtTimeSec(e.time)}</td>
-                    <td className="px-3 py-1.5 text-sm text-red-600 dark:text-red-400">{e.speedKmh} km/h</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <OverspeedTable events={speed.overspeedEvents} />
         </div>
       )}
 
       <div>
         <h3 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Hitrost po vožnjah</h3>
-        <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Začetek</th>
-                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Konec</th>
-                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Povp. hitrost</th>
-                <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Najv. hitrost</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {speed.tripSpeeds.map((t, i) => (
-                <tr key={i}>
-                  <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{fmtTime(t.startTime)}</td>
-                  <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{fmtTime(t.endTime)}</td>
-                  <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{t.avgSpeedKmh} km/h</td>
-                  <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{t.maxSpeedKmh} km/h</td>
-                </tr>
-              ))}
-              {speed.tripSpeeds.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                    Ni voženj v izbranem obdobju.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <TripSpeedsTable tripSpeeds={speed.tripSpeeds} />
       </div>
     </>
   );
@@ -337,39 +178,7 @@ function VseSection({ report }: { report: VehicleReportResult & { ok: true } }) 
       <p className="text-sm text-gray-500 dark:text-gray-400">
         Vse surove podatkovne točke ({rows.length}), z vsemi parametri, ki jih naprava pošilja.
       </p>
-      <div className="max-h-[32rem] overflow-auto rounded-md border border-gray-200 dark:border-gray-700">
-        <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
-          <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800">
-            <tr>
-              <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">Čas</th>
-              {keys.map((k) => (
-                <th key={k} className="whitespace-nowrap px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">
-                  {k}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {rows.map((row, i) => (
-              <tr key={i}>
-                <td className="whitespace-nowrap px-3 py-1.5 text-gray-900 dark:text-gray-100">{fmtTimeSec(row.fixTime)}</td>
-                {keys.map((k) => (
-                  <td key={k} className="whitespace-nowrap px-3 py-1.5 text-gray-900 dark:text-gray-100">
-                    {typeof row[k] === "boolean" ? (row[k] ? "Da" : "Ne") : row[k] == null ? "—" : String(row[k])}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={keys.length + 1} className="px-3 py-6 text-center text-gray-500 dark:text-gray-400">
-                  Ni podatkov v izbranem obdobju.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <VseTable rows={rows} keys={keys} />
     </>
   );
 }
@@ -492,12 +301,14 @@ export default async function PorocilaPage({
       {rangeError && <p className="text-sm text-red-600 dark:text-red-400">{rangeError}</p>}
 
       {exportHref && reports.length > 0 && (
-        <a
-          href={exportHref}
-          className="inline-block rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-        >
-          Izvozi v XLSX
-        </a>
+        <div className="flex justify-end">
+          <a
+            href={exportHref}
+            className="inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+          >
+            Izvoz
+          </a>
+        </div>
       )}
 
       {reports.map((report, i) => (

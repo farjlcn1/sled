@@ -66,7 +66,8 @@ export function AddDriverForm({ tenants }: { tenants?: { id: string; name: strin
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ID koda (RFID/iButton)</label>
         <input
           name="idCode"
-          placeholder="neobvezno"
+          required
+          placeholder="npr. RFID/iButton koda"
           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         />
       </div>

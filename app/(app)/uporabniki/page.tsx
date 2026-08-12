@@ -1,15 +1,7 @@
 import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { AddUserForm } from "./add-user-form";
-import { ToggleActiveButton } from "./toggle-active-button";
-import { EditUserDialog } from "./edit-user-dialog";
-
-const LEVEL_LABELS: Record<string, string> = {
-  SUDO: "Sudo",
-  UP: "UP — upravitelj podjetja",
-  U: "Uporabnik",
-  DEMO: "Demo",
-};
+import { UsersTable, type UserRow } from "./users-table";
 
 export default async function UporabnikiPage({
   searchParams,
@@ -54,6 +46,16 @@ export default async function UporabnikiPage({
         ])
       : [[], [], []];
 
+  const userRows: UserRow[] = users.map((u) => ({
+    id: u.id,
+    email: u.email,
+    fullName: u.fullName,
+    level: u.level,
+    isActive: u.isActive,
+    vehicleIds: u.vehicleAccess.map((a) => a.vehicleId),
+    groupIds: u.vehicleGroupAccess.map((a) => a.groupId),
+  }));
+
   return (
     <div className="space-y-8">
       <section className="space-y-4">
@@ -82,53 +84,7 @@ export default async function UporabnikiPage({
 
         <AddUserForm isSudo={isSudo} tenantId={tenantId} vehicles={vehicles} groups={groups} />
 
-        <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Email</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Ime</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Nivo</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{u.email}</td>
-                  <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{u.fullName}</td>
-                  <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{LEVEL_LABELS[u.level]}</td>
-                  <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{u.isActive ? "Aktiven" : "Onemogočen"}</td>
-                  <td className="px-4 py-2 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <EditUserDialog
-                        targetUser={{
-                          id: u.id,
-                          email: u.email,
-                          level: u.level,
-                          vehicleIds: u.vehicleAccess.map((a) => a.vehicleId),
-                          groupIds: u.vehicleGroupAccess.map((a) => a.groupId),
-                        }}
-                        vehicles={vehicles}
-                        groups={groups}
-                        isSudo={isSudo}
-                      />
-                      <ToggleActiveButton userId={u.id} isActive={u.isActive} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {users.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                    Ni še uporabnikov.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <UsersTable users={userRows} vehicles={vehicles} groups={groups} isSudo={isSudo} />
       </section>
     </div>
   );

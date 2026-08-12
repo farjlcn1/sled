@@ -66,6 +66,55 @@ export async function createDevice(_prevState: DeviceState, formData: FormData):
   revalidatePath("/admin/naprave");
 }
 
+const updateDeviceSchema = z.object({
+  brand: z.string().optional(),
+  model: z.string().optional(),
+  serialNumber: z.string().optional(),
+  simNumber: z.string().optional(),
+  note: z.string().optional(),
+  protocol: z.enum(["TELTONIKA", "OTHER"]),
+});
+
+export type UpdateDeviceState = { error?: string; success?: boolean } | undefined;
+
+export async function updateDevice(
+  deviceId: string,
+  _prevState: UpdateDeviceState,
+  formData: FormData
+): Promise<UpdateDeviceState> {
+  await requirePlatformAdmin();
+
+  const existing = await prisma.device.findUnique({ where: { id: deviceId } });
+  if (!existing) return { error: "Naprava ne obstaja." };
+
+  const parsed = updateDeviceSchema.safeParse({
+    brand: formData.get("brand") || undefined,
+    model: formData.get("model") || undefined,
+    serialNumber: formData.get("serialNumber") || undefined,
+    simNumber: formData.get("simNumber") || undefined,
+    note: formData.get("note") || undefined,
+    protocol: formData.get("protocol") || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
+  }
+
+  await prisma.device.update({
+    where: { id: deviceId },
+    data: {
+      brand: parsed.data.brand || null,
+      model: parsed.data.model || null,
+      serialNumber: parsed.data.serialNumber || null,
+      simNumber: parsed.data.simNumber || null,
+      note: parsed.data.note || null,
+      protocol: parsed.data.protocol,
+    },
+  });
+
+  revalidatePath("/admin/naprave");
+  return { success: true };
+}
+
 export async function assignDeviceToTenant(deviceId: string, tenantId: string) {
   await requirePlatformAdmin();
 

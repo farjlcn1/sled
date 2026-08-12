@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
+import { diffFields, logAudit } from "@/lib/audit";
 import { generateStrongPassword, hashPassword, passwordSchema } from "@/lib/auth/password";
 import { isMailConfigured, sendMail } from "@/lib/mail";
 
@@ -99,6 +100,16 @@ export async function createTenantUser(_prevState: UserState, formData: FormData
     },
   });
 
+  await logAudit({
+    userId: admin.id,
+    userEmail: admin.email,
+    tenantId: admin.tenantId,
+    action: "CREATE",
+    entityType: "User",
+    entityId: user.id,
+    entityLabel: user.email,
+  });
+
   revalidatePath("/uporabniki");
 
   if (parsed.data.passwordMode === "manual") {
@@ -151,7 +162,10 @@ export async function updateUser(_prevState: EditUserState, formData: FormData):
     return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
   }
 
-  const target = await prisma.user.findUnique({ where: { id: parsed.data.userId } });
+  const target = await prisma.user.findUnique({
+    where: { id: parsed.data.userId },
+    include: { vehicleAccess: true, vehicleGroupAccess: true },
+  });
   if (!target) return { error: "Uporabnik ne obstaja." };
 
   if (!isSudo) {
@@ -203,6 +217,25 @@ export async function updateUser(_prevState: EditUserState, formData: FormData):
     }),
   ]);
 
+  const changes = diffFields(target, { level: parsed.data.level });
+  if (target.vehicleAccess.length !== vehicleIds.length) {
+    changes.vehicleIds = { from: target.vehicleAccess.length, to: vehicleIds.length };
+  }
+  if (target.vehicleGroupAccess.length !== groupIds.length) {
+    changes.groupIds = { from: target.vehicleGroupAccess.length, to: groupIds.length };
+  }
+
+  await logAudit({
+    userId: admin.id,
+    userEmail: admin.email,
+    tenantId: admin.tenantId,
+    action: "UPDATE",
+    entityType: "User",
+    entityId: target.id,
+    entityLabel: target.email,
+    changes,
+  });
+
   revalidatePath("/uporabniki");
   return { success: true };
 }
@@ -218,5 +251,17 @@ export async function toggleUserActive(userId: string, isActive: boolean) {
   if (!isSudo && target.tenantId !== admin.tenantId) throw new Error("Ni dovoljeno.");
 
   await prisma.user.update({ where: { id: userId }, data: { isActive } });
+
+  await logAudit({
+    userId: admin.id,
+    userEmail: admin.email,
+    tenantId: admin.tenantId,
+    action: "UPDATE",
+    entityType: "User",
+    entityId: userId,
+    entityLabel: target.email,
+    changes: { isActive: { from: !isActive, to: isActive } },
+  });
+
   revalidatePath("/uporabniki");
 }

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
+import { diffFields, logAudit } from "@/lib/audit";
 import { vehicleWhereForUser } from "@/lib/vehicle-access";
 import { nextPotniNalogNumber, suggestActualFromGps, type GpsSuggestion } from "@/lib/potni-nalog";
 
@@ -62,7 +63,7 @@ export async function createPotniNalog(_prevState: PotniNalogState, formData: Fo
 
   const number = await nextPotniNalogNumber(vehicle.tenantId, departureAt.getFullYear());
 
-  await prisma.potniNalog.create({
+  const nalog = await prisma.potniNalog.create({
     data: {
       tenantId: vehicle.tenantId,
       number,
@@ -76,6 +77,16 @@ export async function createPotniNalog(_prevState: PotniNalogState, formData: Fo
       plannedDepartureAt: departureAt,
       plannedReturnAt: returnAt,
     },
+  });
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId: vehicle.tenantId,
+    action: "CREATE",
+    entityType: "PotniNalog",
+    entityId: nalog.id,
+    entityLabel: number,
   });
 
   revalidatePath("/potni-nalogi");
@@ -120,21 +131,36 @@ export async function completePotniNalog(_prevState: PotniNalogState, formData: 
     return { error: "Ni dovoljeno." };
   }
 
+  const updateData = {
+    status: "ZAKLJUCEN" as const,
+    actualDepartureAt: new Date(parsed.data.actualDepartureAt),
+    actualReturnAt: new Date(parsed.data.actualReturnAt),
+    startOdometerKm: parsed.data.startOdometerKm ?? null,
+    endOdometerKm: parsed.data.endOdometerKm ?? null,
+    actualDistanceKm: parsed.data.actualDistanceKm ?? null,
+    dailyAllowanceEur: parsed.data.dailyAllowanceEur ?? null,
+    otherCostsEur: parsed.data.otherCostsEur ?? null,
+    otherCostsNote: parsed.data.otherCostsNote || null,
+    note: parsed.data.note || null,
+  };
+
   await prisma.potniNalog.update({
     where: { id: nalog.id },
     data: {
-      status: "ZAKLJUCEN",
-      actualDepartureAt: new Date(parsed.data.actualDepartureAt),
-      actualReturnAt: new Date(parsed.data.actualReturnAt),
-      startOdometerKm: parsed.data.startOdometerKm ?? null,
-      endOdometerKm: parsed.data.endOdometerKm ?? null,
-      actualDistanceKm: parsed.data.actualDistanceKm ?? null,
-      dailyAllowanceEur: parsed.data.dailyAllowanceEur ?? null,
-      otherCostsEur: parsed.data.otherCostsEur ?? null,
-      otherCostsNote: parsed.data.otherCostsNote || null,
-      note: parsed.data.note || null,
+      ...updateData,
       driverSignedAt: new Date(),
     },
+  });
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId: nalog.tenantId,
+    action: "UPDATE",
+    entityType: "PotniNalog",
+    entityId: nalog.id,
+    entityLabel: nalog.number,
+    changes: diffFields(nalog, updateData),
   });
 
   revalidatePath("/potni-nalogi");
@@ -156,6 +182,18 @@ export async function likvidirajPotniNalog(id: string) {
     where: { id },
     data: { status: "LIKVIDIRAN", approverSignedAt: new Date() },
   });
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId: nalog.tenantId,
+    action: "UPDATE",
+    entityType: "PotniNalog",
+    entityId: id,
+    entityLabel: nalog.number,
+    changes: { status: { from: nalog.status, to: "LIKVIDIRAN" } },
+  });
+
   revalidatePath("/potni-nalogi");
 }
 

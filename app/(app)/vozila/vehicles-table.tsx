@@ -23,12 +23,16 @@ export type VehicleRow = {
   fuelTankVolumeL: number | null;
   note: string | null;
   deviceId: string | null;
+  deviceImei: string | null;
+  registrationDate: string | null;
+  nextServiceDate: string | null;
+  nextServiceKm: number | null;
   driverName: string | null;
   groupNames: string[];
 };
 
 type SortDir = "asc" | "desc";
-type ColumnKey = "plate" | "brandModel" | "year" | "icon" | "fuelTankVolumeL" | "groups" | "driver" | "note";
+type ColumnKey = "plate" | "brandModel" | "year" | "icon" | "fuelTankVolumeL" | "deviceImei" | "groups" | "driver" | "note";
 
 const COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "plate", label: "Registrska" },
@@ -36,6 +40,7 @@ const COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "year", label: "Letnik" },
   { key: "icon", label: "Ikona" },
   { key: "fuelTankVolumeL", label: "Rezervoar (L)" },
+  { key: "deviceImei", label: "Naprava" },
   { key: "groups", label: "Skupina" },
   { key: "driver", label: "Voznik" },
   { key: "note", label: "Komentar" },
@@ -53,6 +58,8 @@ function sortValue(v: VehicleRow, key: ColumnKey): string | number {
       return ICON_LABELS[v.icon] ?? v.icon;
     case "fuelTankVolumeL":
       return v.fuelTankVolumeL ?? -Infinity;
+    case "deviceImei":
+      return v.deviceImei ?? "";
     case "groups":
       return v.groupNames.join(", ");
     case "driver":
@@ -197,6 +204,7 @@ export function VehiclesTable({
                 <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{v.year ?? "—"}</td>
                 <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{ICON_LABELS[v.icon]}</td>
                 <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{v.fuelTankVolumeL ?? "—"}</td>
+                <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{v.deviceImei ?? "—"}</td>
                 <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
                   {v.groupNames.join(", ") || "—"}
                 </td>

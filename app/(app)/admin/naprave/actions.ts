@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { createTraccarDevice, deleteTraccarDevice } from "@/lib/traccar";
 import { parseXlsxRows, findColumn } from "@/lib/xlsx-import";
+import { logAudit } from "@/lib/audit";
 
 const deviceSchema = z.object({
   imei: z
@@ -222,4 +223,30 @@ export async function importDevicesXlsx(_prevState: ImportDevicesState, formData
 
   revalidatePath("/admin/naprave");
   return { created, errors: errors.length > 0 ? errors : undefined };
+}
+
+// Konceptualni panj — ni pravega SMS gatewaya (glej pogovor). Edina naloga je zabeležiti namero
+// v revizijsko sled za vsako napravo posebej; klicatelj (modal) prikaže potrditveno sporočilo.
+export async function sendDeviceSms(deviceIds: string[], message: string): Promise<{ sent: number }> {
+  const user = await requirePlatformAdmin();
+
+  const devices = await prisma.device.findMany({
+    where: { id: { in: deviceIds } },
+    select: { id: true, imei: true, simNumber: true, tenantId: true },
+  });
+
+  for (const device of devices) {
+    await logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      tenantId: user.tenantId ?? device.tenantId ?? null,
+      action: "UPDATE",
+      entityType: "Device",
+      entityId: device.id,
+      entityLabel: device.imei,
+      changes: { smsSent: { from: null, to: message.slice(0, 200) } },
+    });
+  }
+
+  return { sent: devices.length };
 }

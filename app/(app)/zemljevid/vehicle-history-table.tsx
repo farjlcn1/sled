@@ -52,6 +52,18 @@ export function VehicleHistoryTable({
   const [visibleFields, setVisibleFields] = useState<string[]>(initialVisibleFields);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [pickerOpen]);
 
   // Nov nabor vrstic (nov datumski obseg / drugo vozilo) -> stara izbira po indeksu ni vec smiselna.
   useEffect(() => {
@@ -139,17 +151,17 @@ export function VehicleHistoryTable({
             </span>
           )}
         </h3>
-        <div className="relative flex shrink-0 gap-2">
+        <div ref={pickerRef} className="relative flex shrink-0 gap-2">
           <a
             href={exportHref}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
           >
             Izvozi podatke
           </a>
           <button
             type="button"
             onClick={() => setPickerOpen((v) => !v)}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
           >
             Izberi podatke
           </button>

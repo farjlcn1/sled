@@ -18,6 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/admin/naprave", label: "Naprave", show: user.canManagePlatform },
     { href: "/admin/najemniki", label: "Podjetja", show: user.canManagePlatform },
     { href: "/admin/paketi", label: "Paketi", show: user.canManagePlatform },
+    { href: "/revizijska-sled", label: "Revizijska sled", show: user.canManagePlatform },
   ];
 
   return (

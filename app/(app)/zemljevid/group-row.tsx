@@ -24,6 +24,9 @@ export function GroupRow({
     <tr
       onDoubleClick={onToggleExpand}
       onContextMenu={handleContextMenu}
+      onMouseDown={(e) => {
+        if (e.detail > 1) e.preventDefault();
+      }}
       title="Dvoklik za prikaz vozil v skupini, desni klik za zgodovino celotne skupine"
       className="cursor-pointer bg-gray-50 hover:bg-gray-100 dark:bg-gray-800/60 dark:hover:bg-gray-800"
     >

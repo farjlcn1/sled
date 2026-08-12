@@ -55,6 +55,10 @@ export default async function VozilaPage({
     fuelTankVolumeL: v.fuelTankVolumeL,
     note: v.note,
     deviceId: v.deviceId,
+    deviceImei: v.device?.imei ?? null,
+    registrationDate: v.registrationDate ? v.registrationDate.toISOString() : null,
+    nextServiceDate: v.nextServiceDate ? v.nextServiceDate.toISOString() : null,
+    nextServiceKm: v.nextServiceKm,
     driverName: v.currentDriver?.fullName ?? null,
     groupNames: v.groupMemberships.map((m) => m.group.name),
   }));

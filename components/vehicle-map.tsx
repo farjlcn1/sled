@@ -118,9 +118,13 @@ export function VehicleMap({
   const [error, setError] = useState<string | null>(null);
   const [routeError, setRouteError] = useState<string | null>(null);
   const visibleVehicleIdsRef = useRef(visibleVehicleIds);
+  const pollRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     visibleVehicleIdsRef.current = visibleVehicleIds;
+    // Ne čakaj na naslednji predviden interval — ob vsaki spremembi izbire (kljukica) takoj
+    // povleci sveže pozicije, da se novo izbrano vozilo prikaže na zemljevidu brez čakanja do 5s.
+    pollRef.current();
   }, [visibleVehicleIds]);
 
   useEffect(() => {
@@ -317,6 +321,7 @@ export function VehicleMap({
         if (!cancelled) setError(err instanceof Error ? err.message : "Napaka pri branju pozicij.");
       }
     }
+    pollRef.current = poll;
 
     function updateMarkers(positions: VehiclePosition[]) {
       const map = mapRef.current;

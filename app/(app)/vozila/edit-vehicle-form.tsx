@@ -22,6 +22,9 @@ export type EditableVehicle = {
   fuelTankVolumeL: number | null;
   note: string | null;
   deviceId: string | null;
+  registrationDate: string | null;
+  nextServiceDate: string | null;
+  nextServiceKm: number | null;
 };
 
 function fieldClass() {
@@ -88,6 +91,35 @@ export function EditVehicleForm({
               step="0.1"
               min="0"
               defaultValue={vehicle.fuelTankVolumeL ?? ""}
+              className={`${fieldClass()} no-spinner`}
+            />
+          </label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Datum registracije
+            <input
+              name="registrationDate"
+              type="date"
+              defaultValue={vehicle.registrationDate ? vehicle.registrationDate.slice(0, 10) : ""}
+              className={fieldClass()}
+            />
+          </label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Naslednji servis (datum)
+            <input
+              name="nextServiceDate"
+              type="date"
+              defaultValue={vehicle.nextServiceDate ? vehicle.nextServiceDate.slice(0, 10) : ""}
+              className={fieldClass()}
+            />
+          </label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Naslednji servis (km)
+            <input
+              name="nextServiceKm"
+              type="number"
+              step="1"
+              min="0"
+              defaultValue={vehicle.nextServiceKm ?? ""}
               className={`${fieldClass()} no-spinner`}
             />
           </label>

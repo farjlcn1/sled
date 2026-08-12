@@ -87,6 +87,9 @@ export function VehicleRow({
       <tr
         onContextMenu={handleContextMenu}
         onDoubleClick={() => setExpanded((v) => !v)}
+        onMouseDown={(e) => {
+          if (e.detail > 1) e.preventDefault();
+        }}
         title="Klik za prikaz na zemljevidu, desni klik za zgodovino vožnje, dvoklik za podatke o vozilu"
         className={isSelected ? "bg-blue-50 dark:bg-blue-950" : undefined}
       >
@@ -118,7 +121,8 @@ export function VehicleRow({
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={2} className="bg-gray-50 px-3 py-2 dark:bg-gray-800">
+          <td colSpan={2} className="border-l-4 border-blue-500 bg-blue-50/60 px-3 py-2 dark:border-blue-400 dark:bg-blue-950/40">
+            <p className="mb-2 text-xs font-semibold text-blue-700 dark:text-blue-400">Podatki o vozilu {plate}</p>
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1 text-xs">
                 <div>

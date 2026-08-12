@@ -2,11 +2,7 @@
 
 import { useActionState, useEffect } from "react";
 import { updateDevice } from "./actions";
-
-export const PROTOCOL_OPTIONS: { value: string; label: string }[] = [
-  { value: "TELTONIKA", label: "Teltonika" },
-  { value: "OTHER", label: "Drugo" },
-];
+import { PROTOCOL_OPTIONS } from "./protocol-options";
 
 export type EditableDevice = {
   id: string;

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
+import { logAudit, diffFields } from "@/lib/audit";
 
 const stopSettingsSchema = z.object({
   minStopDurationMin: z.coerce.number().int().min(1).max(180),
@@ -18,6 +19,9 @@ const vehicleSchema = z.object({
   note: z.string().optional(),
   icon: z.enum(["CAR", "VAN", "TRUCK", "EXCAVATOR", "TRACTOR", "MOTORCYCLE"]).default("CAR"),
   fuelTankVolumeL: z.coerce.number().positive().optional(),
+  registrationDate: z.string().optional(),
+  nextServiceDate: z.string().optional(),
+  nextServiceKm: z.coerce.number().optional(),
   deviceId: z.string().optional(),
   groupId: z.string().optional(),
   tenantId: z.string().optional(),
@@ -39,6 +43,9 @@ export async function createVehicle(_prevState: VehicleState, formData: FormData
     note: formData.get("note") || undefined,
     icon: formData.get("icon") || undefined,
     fuelTankVolumeL: formData.get("fuelTankVolumeL") || undefined,
+    registrationDate: formData.get("registrationDate") || undefined,
+    nextServiceDate: formData.get("nextServiceDate") || undefined,
+    nextServiceKm: formData.get("nextServiceKm") || undefined,
     deviceId: formData.get("deviceId") || undefined,
     groupId: formData.get("groupId") || undefined,
     tenantId: formData.get("tenantId") || undefined,
@@ -88,6 +95,9 @@ export async function createVehicle(_prevState: VehicleState, formData: FormData
       note: parsed.data.note,
       icon: parsed.data.icon,
       fuelTankVolumeL: parsed.data.fuelTankVolumeL,
+      registrationDate: parsed.data.registrationDate ? new Date(parsed.data.registrationDate) : null,
+      nextServiceDate: parsed.data.nextServiceDate ? new Date(parsed.data.nextServiceDate) : null,
+      nextServiceKm: parsed.data.nextServiceKm ?? null,
       deviceId: parsed.data.deviceId,
     },
   });
@@ -95,6 +105,16 @@ export async function createVehicle(_prevState: VehicleState, formData: FormData
   if (parsed.data.groupId) {
     await prisma.vehicleGroupMembership.create({ data: { vehicleId: vehicle.id, groupId: parsed.data.groupId } });
   }
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId: user.tenantId,
+    action: "CREATE",
+    entityType: "Vehicle",
+    entityId: vehicle.id,
+    entityLabel: vehicle.plate,
+  });
 
   revalidatePath("/vozila");
   revalidatePath("/zemljevid");
@@ -126,6 +146,9 @@ export async function updateVehicle(
     note: formData.get("note") || undefined,
     icon: formData.get("icon") || undefined,
     fuelTankVolumeL: formData.get("fuelTankVolumeL") || undefined,
+    registrationDate: formData.get("registrationDate") || undefined,
+    nextServiceDate: formData.get("nextServiceDate") || undefined,
+    nextServiceKm: formData.get("nextServiceKm") || undefined,
     deviceId: formData.get("deviceId") || undefined,
   });
   if (!parsed.success) {
@@ -150,12 +173,26 @@ export async function updateVehicle(
         note: parsed.data.note || null,
         icon: parsed.data.icon,
         fuelTankVolumeL: parsed.data.fuelTankVolumeL ?? null,
+        registrationDate: parsed.data.registrationDate ? new Date(parsed.data.registrationDate) : null,
+        nextServiceDate: parsed.data.nextServiceDate ? new Date(parsed.data.nextServiceDate) : null,
+        nextServiceKm: parsed.data.nextServiceKm ?? null,
         deviceId: parsed.data.deviceId || null,
       },
     });
   } catch {
     return { error: "Napaka pri shranjevanju — preveri, da registrska št. in naprava nista že v uporabi." };
   }
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId: user.tenantId,
+    action: "UPDATE",
+    entityType: "Vehicle",
+    entityId: vehicleId,
+    entityLabel: existing.plate,
+    changes: diffFields(existing, parsed.data as Partial<typeof existing>),
+  });
 
   revalidatePath("/vozila");
   revalidatePath("/zemljevid");
@@ -183,6 +220,15 @@ export async function deleteVehicles(vehicleIds: string[]): Promise<DeleteVehicl
     try {
       await prisma.vehicle.delete({ where: { id: v.id } });
       deleted++;
+      await logAudit({
+        userId: user.id,
+        userEmail: user.email,
+        tenantId: user.tenantId,
+        action: "DELETE",
+        entityType: "Vehicle",
+        entityId: v.id,
+        entityLabel: v.plate,
+      });
     } catch {
       failed.push(`${v.plate} (ima povezane potne naloge ali tahografske datoteke)`);
     }
@@ -216,6 +262,16 @@ export async function saveGroupMemberships(
     )
   );
 
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId: user.tenantId,
+    action: "UPDATE",
+    entityType: "VehicleGroup",
+    entityLabel: `${changes.length} sprememb pripadnosti skupinam`,
+    changes: { pairs: { from: null, to: changes } },
+  });
+
   revalidatePath("/vozila");
   revalidatePath("/uporabniki");
   revalidatePath("/skupine");
@@ -236,6 +292,16 @@ export async function createVehicleGroup(_prevState: VehicleState, formData: For
   } catch {
     return { error: "Skupina s tem imenom že obstaja." };
   }
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId: user.tenantId,
+    action: "CREATE",
+    entityType: "VehicleGroup",
+    entityLabel: name,
+  });
+
   revalidatePath("/vozila");
   revalidatePath("/uporabniki");
 }

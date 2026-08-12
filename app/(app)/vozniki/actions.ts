@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission, requirePlatformAdmin, requireUser } from "@/lib/auth/session";
+import { diffFields, logAudit } from "@/lib/audit";
 import { parseXlsxRows, findColumn } from "@/lib/xlsx-import";
 
 const driverSchema = z.object({
@@ -41,8 +42,9 @@ export async function createDriver(_prevState: DriverState, formData: FormData):
     return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
   }
 
+  let driverId: string;
   try {
-    await prisma.driver.create({
+    const driver = await prisma.driver.create({
       data: {
         tenantId,
         fullName: parsed.data.fullName,
@@ -52,9 +54,20 @@ export async function createDriver(_prevState: DriverState, formData: FormData):
         idCode: parsed.data.idCode,
       },
     });
+    driverId = driver.id;
   } catch {
     return { error: "Voznik s to ID kodo že obstaja." };
   }
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId,
+    action: "CREATE",
+    entityType: "Driver",
+    entityId: driverId,
+    entityLabel: parsed.data.fullName,
+  });
 
   revalidatePath("/vozniki");
 }
@@ -103,6 +116,17 @@ export async function updateDriver(
     return { error: "Voznik s to ID kodo že obstaja." };
   }
 
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId: existing.tenantId,
+    action: "UPDATE",
+    entityType: "Driver",
+    entityId: driverId,
+    entityLabel: existing.fullName,
+    changes: diffFields(existing, parsed.data),
+  });
+
   revalidatePath("/vozniki");
   return { success: true };
 }
@@ -118,7 +142,7 @@ export async function deleteDrivers(driverIds: string[]): Promise<DeleteDriversS
 
   const drivers = await prisma.driver.findMany({
     where: { id: { in: driverIds } },
-    select: { id: true, fullName: true },
+    select: { id: true, fullName: true, tenantId: true },
   });
 
   let deleted = 0;
@@ -128,6 +152,15 @@ export async function deleteDrivers(driverIds: string[]): Promise<DeleteDriversS
     try {
       await prisma.driver.delete({ where: { id: d.id } });
       deleted++;
+      await logAudit({
+        userId: user.id,
+        userEmail: user.email,
+        tenantId: d.tenantId,
+        action: "DELETE",
+        entityType: "Driver",
+        entityId: d.id,
+        entityLabel: d.fullName,
+      });
     } catch {
       failed.push(d.fullName);
     }

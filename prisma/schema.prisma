@@ -12,6 +12,15 @@ enum DeviceProtocol {
   OTHER
 }
 
+enum AuditAction {
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  CREATE
+  UPDATE
+  DELETE
+}
+
 enum DriverIdMethod {
   IBUTTON
   RFID
@@ -171,6 +180,7 @@ model Vehicle {
   note               String?
   registrationDate   DateTime?
   nextServiceDate    DateTime?
+  nextServiceKm      Float?
 
   icon             VehicleIconType @default(CAR)
   fuelTankVolumeL  Float?
@@ -375,4 +385,23 @@ model TachoFile {
   createdAt DateTime @default(now())
 
   @@map("tacho_files")
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  tenantId    String?
+  userId      String?
+  userEmail   String
+  action      AuditAction
+  entityType  String
+  entityId    String?
+  entityLabel String?
+  changesJson String?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

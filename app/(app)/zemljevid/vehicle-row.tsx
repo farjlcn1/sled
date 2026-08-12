@@ -106,13 +106,19 @@ export function VehicleRow({
               onToggleChecked();
             }
           }}
-          className={
-            checked
-              ? "cursor-pointer px-3 py-2 text-sm bg-green-100 dark:bg-green-900"
-              : "cursor-pointer px-3 py-2 text-sm"
-          }
+          className={[
+            "cursor-pointer px-3 py-2 text-sm",
+            checked ? "bg-green-100 dark:bg-green-900" : expanded ? "bg-blue-50/60 dark:bg-blue-950/40" : "",
+            expanded ? "border-l-4 border-blue-500 dark:border-blue-400" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
-          <span className="font-medium text-gray-900 dark:text-gray-100">
+          <span
+            className={
+              expanded ? "font-bold text-blue-700 dark:text-blue-400" : "font-medium text-gray-900 dark:text-gray-100"
+            }
+          >
             {plate}
             {driverName && <span className="font-normal text-gray-500 dark:text-gray-400"> ({driverName})</span>}
           </span>
@@ -122,7 +128,6 @@ export function VehicleRow({
       {expanded && (
         <tr>
           <td colSpan={2} className="border-l-4 border-blue-500 bg-blue-50/60 px-3 py-2 dark:border-blue-400 dark:bg-blue-950/40">
-            <p className="mb-2 text-xs font-semibold text-blue-700 dark:text-blue-400">Podatki o vozilu {plate}</p>
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1 text-xs">
                 <div>

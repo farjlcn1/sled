@@ -88,6 +88,7 @@ model Tenant {
   vehicleGroups VehicleGroup[]
   potniNalogi  PotniNalog[]
   tachoFiles   TachoFile[]
+  reservations VehicleReservation[]
   subscription Subscription?
 
   @@map("tenants")
@@ -202,6 +203,7 @@ model Vehicle {
   privacyPeriods   VehiclePrivacyPeriod[]
   potniNalogi      PotniNalog[]
   tachoFiles       TachoFile[]
+  reservations     VehicleReservation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -242,6 +244,7 @@ model Driver {
   currentVehicles Vehicle[] @relation("CurrentDriver")
   potniNalogi     PotniNalog[]
   tachoFiles      TachoFile[]
+  reservations    VehicleReservation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -353,6 +356,32 @@ model PotniNalog {
 
   @@unique([tenantId, number])
   @@map("potni_nalogi")
+}
+
+// Rezervacija vozila — lahek koledarski vnos ("kdo ima vozilo kdaj"), ločeno od potnega naloga
+// (ki je knjigovodska listina). Prekrivanje časovnih razponov za isto vozilo se preverja v kodi.
+model VehicleReservation {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  driverId  String?
+  driver    Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  routeName String
+  startAt   DateTime
+  endAt     DateTime
+
+  createdByName String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, startAt])
+  @@index([vehicleId, startAt])
+  @@map("vehicle_reservations")
 }
 
 // Ali gre za prenos iz enote v vozilu (VU) ali s kartice voznika.

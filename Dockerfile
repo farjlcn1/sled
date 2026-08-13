@@ -1,5 +1,9 @@
 FROM node:24-slim AS base
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get install -y openssl tzdata && rm -rf /var/lib/apt/lists/*
+# Podjetje posluje samo v Sloveniji — vsi datumsko/časovni izračuni (rezervacije vozil, izpisi,
+# revizijska sled ...) morajo teči v tem času, ne v UTC, sicer se lokalni "naivni" datumski nizi
+# (npr. iz <input type="datetime-local">) na strežniku tolmačijo narobe za 1-2 uri.
+ENV TZ=Europe/Ljubljana
 
 FROM base AS deps
 WORKDIR /app

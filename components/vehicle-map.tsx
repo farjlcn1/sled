@@ -110,6 +110,7 @@ export function VehicleMap({
   highlightPaths?: [number, number][][];
 } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const outerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Map<string, Marker>>(new Map());
   const historyMarkersRef = useRef<Marker[]>([]);
@@ -152,6 +153,22 @@ export function VehicleMap({
       map.off("zoomend", handleViewChange);
       map.remove();
       mapRef.current = null;
+    };
+  }, []);
+
+  // MapLibre GL JS sam ne zazna spremembe CSS velikosti svojega vsebnika — canvas je treba ob
+  // vsaki spremembi velikosti (npr. ročno raztegovanje z resize-y ročico) eksplicitno ponovno
+  // umeriti z map.resize(), sicer ostane po raztegu videti pokvarjen (napačna velikost/prazna polja).
+  useEffect(() => {
+    if (!outerRef.current) return;
+
+    const observer = new ResizeObserver(() => {
+      mapRef.current?.resize();
+    });
+    observer.observe(outerRef.current);
+
+    return () => {
+      observer.disconnect();
     };
   }, []);
 
@@ -371,7 +388,10 @@ export function VehicleMap({
   }, []);
 
   return (
-    <div className="relative h-[75vh] min-h-[520px] w-full overflow-hidden rounded-md border border-gray-200 dark:border-gray-700">
+    <div
+      ref={outerRef}
+      className="relative h-[75vh] min-h-[520px] w-full resize-y overflow-hidden rounded-md border border-gray-200 dark:border-gray-700"
+    >
       <div ref={containerRef} className="h-full w-full" />
       {(error || routeError) && (
         <p className="absolute bottom-2 left-2 rounded bg-red-600/90 px-2 py-1 text-xs text-white">

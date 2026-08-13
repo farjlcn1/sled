@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { updateVisibleVehicleFields } from "@/app/(app)/vozila/actions";
 import type { HistoryRow } from "@/lib/history-data";
+import { haversineKm } from "@/lib/trips";
 
 function formatFieldLabel(key: string): string {
   const spaced = key.replace(/([A-Z])/g, " $1");
@@ -34,6 +35,25 @@ function compareValues(a: unknown, b: unknown): number {
   if (typeof a === "boolean" && typeof b === "boolean") return Number(a) - Number(b);
   if (typeof a === "number" && typeof b === "number") return a - b;
   return String(a).localeCompare(String(b), "sl-SI", { numeric: true });
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+// Sešteje razdaljo med zaporednimi točkami (v podanem vrstnem redu — klicatelj poskrbi za sortiranje).
+// Točke z manjkajočim/neveljavnim GPS fixom preskoči, namesto da bi vrnile napačno razdaljo.
+function computeDistanceKm(points: HistoryRow[]): number {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const lat1 = toFiniteNumber(points[i - 1].latitude);
+    const lon1 = toFiniteNumber(points[i - 1].longitude);
+    const lat2 = toFiniteNumber(points[i].latitude);
+    const lon2 = toFiniteNumber(points[i].longitude);
+    if (lat1 === null || lon1 === null || lat2 === null || lon2 === null) continue;
+    total += haversineKm(lat1, lon1, lat2, lon2);
+  }
+  return total;
 }
 
 export function VehicleHistoryTable({
@@ -113,6 +133,12 @@ export function VehicleHistoryTable({
   const draggingRef = useRef(false);
   const anchorPosRef = useRef<number | null>(null);
 
+  // Auto-scroll ob vlečenju blizu zgornjega/spodnjega roba scrollable vsebnika (glej efekt spodaj).
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const autoScrollDirRef = useRef<0 | 1 | -1>(0);
+  const lastMouseRef = useRef({ x: 0, y: 0 });
+  const autoScrollRafRef = useRef<number | null>(null);
+
   function commitRange(fromPos: number, toPos: number) {
     const lo = Math.min(fromPos, toPos);
     const hi = Math.max(fromPos, toPos);
@@ -132,22 +158,118 @@ export function VehicleHistoryTable({
     commitRange(anchorPosRef.current, displayIndex);
   }
 
+  // Vedno sveža referenca na trenutni handleRowMouseEnter (zapre nad trenutnim sortedRows/commitRange),
+  // da jo lahko kliče rAF zanka spodaj, ne da bi jo bilo treba dodajati med odvisnosti tistega
+  // mount-only efekta (kar bi zahtevalo prevezovanje window listenerja ob vsakem renderju).
+  const handleRowMouseEnterRef = useRef(handleRowMouseEnter);
+  handleRowMouseEnterRef.current = handleRowMouseEnter;
+
   useEffect(() => {
     function stopDragging() {
       draggingRef.current = false;
+      autoScrollDirRef.current = 0;
     }
     window.addEventListener("mouseup", stopDragging);
     return () => window.removeEventListener("mouseup", stopDragging);
   }, []);
+
+  // Ko uporabnik vleče izbiro blizu zgornjega/spodnjega roba scrollable tabele, samodejno scrollamo
+  // v to smer, dokler se kurzor ne odmakne od roba ali uporabnik ne spusti miškinega gumba — tudi
+  // če miška medtem miruje (zato rAF zanka, ne le mousemove: vsebina se premika pod nepremičnim
+  // kurzorjem, zato se mouseenter ne bo zanesljivo sprožil sam in vrstico pod kurzorjem moramo
+  // na vsak frame poiskati ročno prek document.elementFromPoint).
+  useEffect(() => {
+    const EDGE_PX = 48;
+    const SCROLL_STEP_PX = 10;
+
+    function runAutoScrollStep() {
+      autoScrollRafRef.current = null;
+
+      const container = scrollContainerRef.current;
+      if (!draggingRef.current || autoScrollDirRef.current === 0 || !container) return;
+
+      container.scrollTop += autoScrollDirRef.current * SCROLL_STEP_PX;
+
+      const { x, y } = lastMouseRef.current;
+      const el = document.elementFromPoint(x, y);
+      const rowEl = el?.closest("[data-display-index]") ?? null;
+      if (rowEl) {
+        const attr = rowEl.getAttribute("data-display-index");
+        const idx = attr === null ? NaN : Number(attr);
+        if (Number.isFinite(idx)) handleRowMouseEnterRef.current(idx);
+      }
+
+      // Opomba: autoScrollDirRef.current je tu zagotovo se vedno != 0 (zgornji zgodnji "return" bi
+      // sicer ze koncal funkcijo), zato ponovno preverjanje ni potrebno - le se draggingRef.current.
+      if (draggingRef.current) {
+        autoScrollRafRef.current = requestAnimationFrame(runAutoScrollStep);
+      }
+    }
+
+    function ensureAutoScrollLoop() {
+      if (autoScrollRafRef.current === null) {
+        autoScrollRafRef.current = requestAnimationFrame(runAutoScrollStep);
+      }
+    }
+
+    function handleWindowMouseMove(e: MouseEvent) {
+      lastMouseRef.current = { x: e.clientX, y: e.clientY };
+
+      const container = scrollContainerRef.current;
+      if (!draggingRef.current || !container) {
+        autoScrollDirRef.current = 0;
+        return;
+      }
+
+      const rect = container.getBoundingClientRect();
+      const atTop = container.scrollTop <= 1;
+      const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
+
+      if (e.clientY >= rect.top && e.clientY - rect.top < EDGE_PX && !atTop) {
+        autoScrollDirRef.current = -1;
+        ensureAutoScrollLoop();
+      } else if (e.clientY <= rect.bottom && rect.bottom - e.clientY < EDGE_PX && !atBottom) {
+        autoScrollDirRef.current = 1;
+        ensureAutoScrollLoop();
+      } else {
+        autoScrollDirRef.current = 0;
+      }
+    }
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      if (autoScrollRafRef.current !== null) {
+        cancelAnimationFrame(autoScrollRafRef.current);
+        autoScrollRafRef.current = null;
+      }
+    };
+  }, []);
+
+  const totalDistanceKm = useMemo(() => computeDistanceKm(rows), [rows]);
+
+  // Izbira ni nujno kronološka (vlečenje od spodaj navzgor vstavi indekse v obratnem vrstnem redu v Set),
+  // zato pred računanjem razdalje eksplicitno sortiramo po fixTime — enako kot za highlight pot na zemljevidu
+  // (glej vehicles-panel.tsx).
+  const selectedDistanceKm = useMemo(() => {
+    const subset = Array.from(selectedIndices)
+      .map((i) => rows[i])
+      .filter((r): r is HistoryRow => Boolean(r))
+      .sort((a, b) => a.fixTime.localeCompare(b.fixTime));
+    return computeDistanceKm(subset);
+  }, [selectedIndices, rows]);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
           Zgodovina pozicij ({rows.length})
+          <span className="ml-2 font-normal text-gray-500 dark:text-gray-400">
+            — {totalDistanceKm.toFixed(1)} km
+          </span>
           {selectedIndices.size > 0 && (
             <span className="ml-2 font-normal text-amber-700 dark:text-amber-400">
-              — izbranih {selectedIndices.size}
+              — izbranih {selectedIndices.size} ({selectedDistanceKm.toFixed(1)} km)
             </span>
           )}
         </h3>
@@ -184,7 +306,10 @@ export function VehicleHistoryTable({
       {rows.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">Ni podatkov v izbranem obdobju.</p>
       ) : (
-        <div className="max-h-[32rem] overflow-auto rounded-md border border-gray-200 dark:border-gray-700">
+        <div
+          ref={scrollContainerRef}
+          className="max-h-[32rem] overflow-auto rounded-md border border-gray-200 dark:border-gray-700"
+        >
           <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
             <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800">
               <tr>
@@ -217,6 +342,7 @@ export function VehicleHistoryTable({
                 return (
                   <tr
                     key={originalIndex}
+                    data-display-index={displayIndex}
                     onMouseDown={() => handleRowMouseDown(displayIndex)}
                     onMouseEnter={() => handleRowMouseEnter(displayIndex)}
                     title="Klik za izbiro, klik in vlečenje za izbiro več vrstic — izbrano se pobarva na zemljevidu"

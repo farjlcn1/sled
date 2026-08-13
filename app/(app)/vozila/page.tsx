@@ -104,6 +104,15 @@ export default async function VozilaPage({
             />
           )}
 
+          <div className="flex justify-end">
+            <a
+              href={`/api/vozila/izvoz${isPlatformAdmin ? `?podjetje=${tenantId}` : ""}`}
+              className="inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+            >
+              Izvoz
+            </a>
+          </div>
+
           <VehiclesTable vehicles={vehicleRows} availableDevices={availableDevices} canBulkDelete={user.canManagePlatform} />
         </section>
       )}

@@ -10,6 +10,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/zemljevid", label: "Zemljevid", show: true },
     { href: "/vozila", label: "Vozila", show: user.canManageVehicles || user.canManagePlatform },
     { href: "/skupine", label: "Skupine", show: user.canManageVehicles || user.canManagePlatform },
+    { href: "/rezervacije", label: "Rezervacija vozila", show: user.canManageVehicles || user.canManagePlatform },
     { href: "/vozniki", label: "Vozniki", show: true },
     { href: "/porocila", label: "Poročila", show: user.canViewReports },
     { href: "/potni-nalogi", label: "Potni nalogi", show: user.canManageUsers },

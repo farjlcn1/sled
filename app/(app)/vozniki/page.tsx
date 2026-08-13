@@ -43,6 +43,15 @@ export default async function VozNikiPage() {
       {canAddDriver && <AddDriverForm tenants={!user.tenantId ? tenants : undefined} />}
       {isPlatformAdmin && <ImportDriversForm />}
 
+      <div className="flex justify-end">
+        <a
+          href="/api/vozniki/izvoz"
+          className="inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+        >
+          Izvoz
+        </a>
+      </div>
+
       <DriversTable
         drivers={driverRows}
         vehicles={vehicles}

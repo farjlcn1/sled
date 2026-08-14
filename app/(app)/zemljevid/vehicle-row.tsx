@@ -82,20 +82,35 @@ export function VehicleRow({
     onContextMenu(vehicleId, e.clientX, e.clientY);
   }
 
+  function handleToggle() {
+    onToggleChecked();
+    setExpanded((v) => !v);
+  }
+
   return (
     <tr
       onContextMenu={handleContextMenu}
-      onDoubleClick={() => setExpanded((v) => !v)}
       onMouseDown={(e) => {
         if (e.detail > 1) e.preventDefault();
       }}
-      title="Klik za prikaz na zemljevidu, desni klik za zgodovino vožnje, dvoklik za podatke o vozilu"
+      title="Klik za prikaz na zemljevidu in podatke o vozilu, desni klik za zgodovino vožnje"
       className={isSelected ? "bg-blue-50 dark:bg-blue-950" : undefined}
     >
       <td
         colSpan={2}
+        onClick={handleToggle}
+        role="checkbox"
+        aria-checked={checked}
+        aria-label={`Prikaži ${plate} na zemljevidu in podatke o vozilu`}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleToggle();
+          }
+        }}
         className={[
-          "px-3 py-2 text-sm",
+          "cursor-pointer px-3 py-2 text-sm",
           checked ? "bg-green-100 dark:bg-green-900" : expanded ? "bg-blue-50/60 dark:bg-blue-950/40" : "",
           expanded ? "border-l-4 border-blue-500 dark:border-blue-400" : "",
         ]
@@ -103,20 +118,7 @@ export function VehicleRow({
           .join(" ")}
       >
         <div className="flex items-start justify-between gap-3">
-          <div
-            onClick={onToggleChecked}
-            role="checkbox"
-            aria-checked={checked}
-            aria-label={`Prikaži ${plate} na zemljevidu`}
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onToggleChecked();
-              }
-            }}
-            className="cursor-pointer"
-          >
+          <div>
             <span
               className={
                 expanded
@@ -136,7 +138,10 @@ export function VehicleRow({
           {expanded && (
             <button
               type="button"
-              onClick={() => onLoadHistory(vehicleId, plate)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onLoadHistory(vehicleId, plate);
+              }}
               className="shrink-0 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white"
             >
               Naloži zgodovino

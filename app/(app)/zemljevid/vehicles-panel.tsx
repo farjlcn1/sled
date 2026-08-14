@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VehicleMap, type HistoryRoute } from "@/components/vehicle-map";
 import { SlovenianDateInput } from "@/components/date-input";
@@ -87,14 +87,12 @@ export function VehiclesPanel({
   vehicles,
   groups,
   selectedVehicleIds = [],
-  isPlatformAdmin,
   selections,
   initialVisibleFields,
 }: {
   vehicles: VehicleListItem[];
   groups: GroupItem[];
   selectedVehicleIds?: string[];
-  isPlatformAdmin: boolean;
   selections: SelectionData[];
   initialVisibleFields: string[];
 }) {
@@ -133,6 +131,46 @@ export function VehiclesPanel({
       return next;
     });
   }
+
+  // Ctrl+klik-in-vlečenje čez vozila v seznamu zajame vsa vozila med začetno in trenutno vrstico
+  // (ne glede na trenutni zavihek Vozila/Skupine) -- ne prikaže/naloži ničesar samodejno kot
+  // navaden klik, samo jih odkljuka, da je nato mogoče desni klik -> "Naloži zgodovino za N vozil".
+  const ctrlDragAnchorIdRef = useRef<string | null>(null);
+  const ctrlDragSnapshotRef = useRef<Set<string>>(new Set());
+  const ctrlDraggingRef = useRef(false);
+
+  function applyCtrlDragRange(currentId: string) {
+    const anchorId = ctrlDragAnchorIdRef.current;
+    if (!anchorId) return;
+    const anchorIdx = vehicles.findIndex((v) => v.id === anchorId);
+    const currentIdx = vehicles.findIndex((v) => v.id === currentId);
+    if (anchorIdx === -1 || currentIdx === -1) return;
+    const lo = Math.min(anchorIdx, currentIdx);
+    const hi = Math.max(anchorIdx, currentIdx);
+    const next = new Set(ctrlDragSnapshotRef.current);
+    for (let i = lo; i <= hi; i++) next.add(vehicles[i].id);
+    setCheckedIds(next);
+  }
+
+  function handleCtrlDragStart(vehicleId: string) {
+    ctrlDraggingRef.current = true;
+    ctrlDragAnchorIdRef.current = vehicleId;
+    ctrlDragSnapshotRef.current = new Set(checkedIds);
+    applyCtrlDragRange(vehicleId);
+  }
+
+  function handleCtrlDragEnter(vehicleId: string) {
+    if (!ctrlDraggingRef.current) return;
+    applyCtrlDragRange(vehicleId);
+  }
+
+  useEffect(() => {
+    function stopCtrlDragging() {
+      ctrlDraggingRef.current = false;
+    }
+    window.addEventListener("mouseup", stopCtrlDragging);
+    return () => window.removeEventListener("mouseup", stopCtrlDragging);
+  }, []);
 
   const allChecked = vehicles.length > 0 && vehicles.every((v) => checkedIds.has(v.id));
 
@@ -281,11 +319,11 @@ export function VehiclesPanel({
                       registrationDate={v.registrationDate}
                       nextServiceDate={v.nextServiceDate}
                       note={v.note}
-                      tenantName={v.tenantName}
-                      isPlatformAdmin={isPlatformAdmin}
                       isSelected={selectedVehicleIds.includes(v.id)}
                       checked={checkedIds.has(v.id)}
                       onToggleChecked={() => toggleChecked(v.id)}
+                      onCtrlDragStart={handleCtrlDragStart}
+                      onCtrlDragEnter={handleCtrlDragEnter}
                       onContextMenu={(vehicleId, x, y) => setContextMenu({ target: { type: "vehicle", vehicleId }, x, y })}
                       onLoadHistory={(vehicleId, label) => openHistoryDialogForIds([vehicleId], label)}
                     />
@@ -328,8 +366,6 @@ export function VehiclesPanel({
                                 registrationDate={v.registrationDate}
                                 nextServiceDate={v.nextServiceDate}
                                 note={v.note}
-                                tenantName={v.tenantName}
-                                isPlatformAdmin={isPlatformAdmin}
                                 isSelected={selectedVehicleIds.includes(v.id)}
                                 checked={checkedIds.has(v.id)}
                                 onToggleChecked={() => toggleChecked(v.id)}

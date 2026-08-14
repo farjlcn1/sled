@@ -19,7 +19,6 @@ export default async function ZemljevidPage({
   searchParams: Promise<{ vozilo?: string; from?: string; to?: string }>;
 }) {
   const user = await requireUser();
-  const isPlatformAdmin = user.canManagePlatform;
   const { vozilo, from, to } = await searchParams;
   const selectedVehicleIds = vozilo ? vozilo.split(",").filter(Boolean) : [];
 
@@ -100,7 +99,6 @@ export default async function ZemljevidPage({
         vehicleIds: g.vehicles.map((m) => m.vehicleId),
       }))}
       selectedVehicleIds={selectedVehicleIds}
-      isPlatformAdmin={isPlatformAdmin}
       selections={selectionData}
       initialVisibleFields={user.visibleVehicleFields}
     />

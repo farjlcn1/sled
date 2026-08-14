@@ -30,13 +30,13 @@ export function VehicleRow({
   registrationDate,
   nextServiceDate,
   note,
-  tenantName,
-  isPlatformAdmin,
   isSelected,
   checked,
   onToggleChecked,
   onContextMenu,
   onLoadHistory,
+  onCtrlDragStart,
+  onCtrlDragEnter,
 }: {
   vehicleId: string;
   plate: string;
@@ -46,13 +46,15 @@ export function VehicleRow({
   registrationDate: string | null;
   nextServiceDate: string | null;
   note: string | null;
-  tenantName: string | null;
-  isPlatformAdmin: boolean;
   isSelected: boolean;
   checked: boolean;
   onToggleChecked: () => void;
   onContextMenu: (vehicleId: string, x: number, y: number) => void;
   onLoadHistory: (vehicleId: string, label: string) => void;
+  // Ctrl+klik-in-vlečenje čez več vrstic zajame vsa vozila vmes (glej vehicles-panel.tsx) --
+  // ločeno od navadnega klika, ki preklopi/razširi samo eno vozilo.
+  onCtrlDragStart?: (vehicleId: string) => void;
+  onCtrlDragEnter?: (vehicleId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<VehicleQuickStatus | null>(null);
@@ -92,13 +94,23 @@ export function VehicleRow({
       onContextMenu={handleContextMenu}
       onMouseDown={(e) => {
         if (e.detail > 1) e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          // Brez tega brskalnik ob vlečenju z Ctrl začne označevati besedilo (native selection),
+          // kar prevzame miškine dogodke namesto našega range-select mehanizma spodaj.
+          e.preventDefault();
+          onCtrlDragStart?.(vehicleId);
+        }
       }}
-      title="Klik za prikaz na zemljevidu in podatke o vozilu, desni klik za zgodovino vožnje"
+      onMouseEnter={() => onCtrlDragEnter?.(vehicleId)}
+      title="Klik za prikaz na zemljevidu in podatke o vozilu, desni klik za zgodovino vožnje, ctrl+vlečenje za izbiro več vozil"
       className={isSelected ? "bg-blue-50 dark:bg-blue-950" : undefined}
     >
       <td
         colSpan={2}
-        onClick={handleToggle}
+        onClick={(e) => {
+          if (e.ctrlKey || e.metaKey) return;
+          handleToggle();
+        }}
         role="checkbox"
         aria-checked={checked}
         aria-label={`Prikaži ${plate} na zemljevidu in podatke o vozilu`}
@@ -167,12 +179,6 @@ export function VehicleRow({
               <span className="text-gray-500 dark:text-gray-400">Naslednji servis: </span>
               <span className="text-gray-900 dark:text-gray-100">{fmtDate(nextServiceDate)}</span>
             </div>
-            {isPlatformAdmin && (
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Podjetje: </span>
-                <span className="text-gray-900 dark:text-gray-100">{tenantName}</span>
-              </div>
-            )}
             {note && (
               <div>
                 <span className="text-gray-500 dark:text-gray-400">Opomba: </span>
@@ -190,6 +196,7 @@ export function VehicleRow({
                     {new Date(detail.fixTime).toLocaleString("sl-SI", {
                       day: "2-digit",
                       month: "2-digit",
+                      year: "numeric",
                       hour: "2-digit",
                       minute: "2-digit",
                     })}

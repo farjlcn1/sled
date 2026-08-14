@@ -113,7 +113,14 @@ export function VehicleMap({
   const outerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [height, setHeight] = useState<number | null>(null);
-  const resizeDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const [width, setWidth] = useState<number | null>(null);
+  const resizeDragRef = useRef<{
+    startX: number;
+    startY: number;
+    startWidth: number;
+    startHeight: number;
+    axis: "x" | "y" | "both";
+  } | null>(null);
   const markersRef = useRef<Map<string, Marker>>(new Map());
   const historyMarkersRef = useRef<Marker[]>([]);
   const prevRouteCountRef = useRef(0);
@@ -174,15 +181,20 @@ export function VehicleMap({
     };
   }, []);
 
-  // Ročica za spremembo višine spodaj (glej JSX) — nativna CSS "resize" lastnost se je izkazala za
+  // Ročice za spremembo velikosti (glej JSX) — nativna CSS "resize" lastnost se je izkazala za
   // nezanesljivo, ker MapLibrov lastni "attribution" kontrolnik sedi točno v spodnjem desnem kotu
-  // in prestreza klike, namenjene brskalnikovi kljuki za raztegovanje. Zato višino upravljamo sami.
+  // in prestreza klike, namenjene brskalnikovi kljuki za raztegovanje. Zato velikost upravljamo sami,
+  // z ločenimi ročicami za višino (spodaj), širino (desno) in obe hkrati (spodnji desni kot).
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
       const drag = resizeDragRef.current;
       if (!drag) return;
-      const next = Math.max(320, drag.startHeight + (e.clientY - drag.startY));
-      setHeight(next);
+      if (drag.axis === "y" || drag.axis === "both") {
+        setHeight(Math.max(320, drag.startHeight + (e.clientY - drag.startY)));
+      }
+      if (drag.axis === "x" || drag.axis === "both") {
+        setWidth(Math.max(320, drag.startWidth + (e.clientX - drag.startX)));
+      }
     }
     function handleMouseUp() {
       resizeDragRef.current = null;
@@ -195,11 +207,17 @@ export function VehicleMap({
     };
   }, []);
 
-  function handleResizeHandleMouseDown(e: React.MouseEvent) {
-    e.preventDefault();
-    resizeDragRef.current = {
-      startY: e.clientY,
-      startHeight: outerRef.current?.getBoundingClientRect().height ?? 520,
+  function handleResizeHandleMouseDown(axis: "x" | "y" | "both") {
+    return (e: React.MouseEvent) => {
+      e.preventDefault();
+      const rect = outerRef.current?.getBoundingClientRect();
+      resizeDragRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startWidth: rect?.width ?? 640,
+        startHeight: rect?.height ?? 520,
+        axis,
+      };
     };
   }
 
@@ -421,10 +439,15 @@ export function VehicleMap({
   return (
     <div
       ref={outerRef}
-      className={`relative w-full overflow-hidden rounded-md border border-gray-200 dark:border-gray-700 ${
+      className={`relative overflow-hidden rounded-md border border-gray-200 dark:border-gray-700 ${
         height === null ? "h-[75vh] min-h-[520px]" : ""
-      }`}
-      style={height !== null ? { height, minHeight: 320 } : undefined}
+      } ${width === null ? "w-full" : ""}`}
+      style={{
+        ...(height !== null ? { height } : undefined),
+        ...(width !== null ? { width } : undefined),
+        minHeight: 320,
+        minWidth: 320,
+      }}
     >
       <div ref={containerRef} className="h-full w-full" />
       {(error || routeError) && (
@@ -432,12 +455,36 @@ export function VehicleMap({
           {error ?? routeError}
         </p>
       )}
+      {/* spodnji rob — samo višina */}
       <div
-        onMouseDown={handleResizeHandleMouseDown}
-        title="Povleci za spremembo velikosti zemljevida"
+        onMouseDown={handleResizeHandleMouseDown("y")}
+        title="Povleci za spremembo višine"
         className="absolute inset-x-0 bottom-0 z-20 flex h-3 cursor-ns-resize items-center justify-center hover:bg-black/10 dark:hover:bg-white/10"
       >
         <div className="h-1 w-10 rounded-full bg-gray-400/80 dark:bg-gray-300/70" />
+      </div>
+      {/* desni rob — samo širina */}
+      <div
+        onMouseDown={handleResizeHandleMouseDown("x")}
+        title="Povleci za spremembo širine"
+        className="absolute inset-y-0 right-0 z-20 flex w-3 cursor-ew-resize items-center justify-center hover:bg-black/10 dark:hover:bg-white/10"
+      >
+        <div className="h-10 w-1 rounded-full bg-gray-400/80 dark:bg-gray-300/70" />
+      </div>
+      {/* spodnji desni kot — obe hkrati (diagonalno) */}
+      <div
+        onMouseDown={handleResizeHandleMouseDown("both")}
+        title="Povleci za spremembo velikosti"
+        className="absolute bottom-0 right-0 z-20 h-4 w-4 cursor-nwse-resize"
+      >
+        <svg viewBox="0 0 16 16" className="h-full w-full text-gray-400/80 dark:text-gray-300/70">
+          <path
+            d="M14 2 L2 14 M14 7 L7 14 M14 12 L12 14"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
       </div>
       <style jsx global>{`
         .vehicle-marker {

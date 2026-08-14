@@ -56,14 +56,25 @@ type ContextMenuTarget =
   | { type: "vehicle"; vehicleId: string }
   | { type: "group"; groupId: string };
 
+// d.toISOString() vrne UTC datum, d.setDate/getDate pa delata v lokalnem času -- v Ljubljani
+// (UTC+2) lokalna polnoč pade na 22:00 UTC PREJŠNJEGA dne, zato bi toISOString().slice(0,10) tu
+// vrnil dan prej kot je dejansko mišljeno. Za "lokalni koledarski dan" sestavimo niz iz lokalnih
+// komponent, ne iz UTC.
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function defaultFrom() {
   const d = new Date();
   d.setDate(d.getDate() - 7);
-  return `${d.toISOString().slice(0, 10)}T00:00`;
+  return `${localDateStr(d)}T00:00`;
 }
 
 function defaultTo() {
-  return `${new Date().toISOString().slice(0, 10)}T23:59`;
+  return `${localDateStr(new Date())}T23:59`;
 }
 
 function tabClass(active: boolean) {
@@ -104,11 +115,21 @@ export function VehiclesPanel({
     return () => document.removeEventListener("click", close);
   }, [contextMenu]);
 
+  // Klik, ki vozilo odkljuka (prikaže na zemljevidu), spodaj takoj naloži tudi njegovo zadnjo
+  // zgodovino/pozicijo -- brez odkljukanja/vozila ni treba posebej odpirati dialoga "Naloži zgodovino".
+  function quickLoadHistory(vehicleId: string) {
+    router.push(`/zemljevid?vozilo=${vehicleId}&from=${defaultFrom()}&to=${defaultTo()}`);
+  }
+
   function toggleChecked(id: string) {
     setCheckedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        quickLoadHistory(id);
+      }
       return next;
     });
   }
@@ -399,48 +420,7 @@ export function VehiclesPanel({
 
       {selections.map((s) => (
         <div key={s.vehicleId} className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Registrska: </span>
-              <span className="text-gray-900 dark:text-gray-100">{s.plate}</span>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Znamka/model: </span>
-              <span className="text-gray-900 dark:text-gray-100">{s.brandModel}</span>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Letnik: </span>
-              <span className="text-gray-900 dark:text-gray-100">{s.year ?? "—"}</span>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Voznik: </span>
-              <span className="text-gray-900 dark:text-gray-100">{s.driverName ?? "—"}</span>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Datum registracije: </span>
-              <span className="text-gray-900 dark:text-gray-100">
-                {s.registrationDate ? new Date(s.registrationDate).toLocaleDateString("sl-SI") : "—"}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-500 dark:text-gray-400">Naslednji servis: </span>
-              <span className="text-gray-900 dark:text-gray-100">
-                {s.nextServiceDate ? new Date(s.nextServiceDate).toLocaleDateString("sl-SI") : "—"}
-              </span>
-            </div>
-            {isPlatformAdmin && (
-              <div>
-                <span className="text-gray-500 dark:text-gray-400">Podjetje: </span>
-                <span className="text-gray-900 dark:text-gray-100">{s.tenantName}</span>
-              </div>
-            )}
-            {s.note && (
-              <div className="col-span-2">
-                <span className="text-gray-500 dark:text-gray-400">Opomba: </span>
-                <span className="text-gray-900 dark:text-gray-100">{s.note}</span>
-              </div>
-            )}
-          </div>
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{s.plate}</p>
 
           {s.error ? (
             <p className="text-sm text-red-600 dark:text-red-400">{s.error}</p>

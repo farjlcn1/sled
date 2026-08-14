@@ -13,6 +13,17 @@ const DAY_LABELS = ["Pon", "Tor", "Sre", "Čet", "Pet", "Sob", "Ned"];
 const PX_PER_HOUR = 40;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
+// d.toISOString() vrne UTC datum, d.setDate/getDate pa delata v lokalnem času -- v Ljubljani
+// (UTC+2) lokalna polnoč pade na 22:00 UTC PREJŠNJEGA dne, zato bi toISOString().slice(0,10) tu
+// vrnil dan prej kot smo ga dejansko izbrali. Za "lokalni koledarski dan" moramo sestaviti niz iz
+// lokalnih komponent, ne iz UTC.
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export type ReservationItem = {
   id: string;
   vehicleId: string;
@@ -115,7 +126,7 @@ export function ReservationCalendar({
     const d = new Date(weekStart);
     d.setDate(d.getDate() + offsetDays);
     const params = new URLSearchParams(window.location.search);
-    params.set("teden", d.toISOString().slice(0, 10));
+    params.set("teden", localDateStr(d));
     router.push(`/rezervacije?${params.toString()}`);
   }
 
@@ -145,21 +156,21 @@ export function ReservationCalendar({
           <button
             type="button"
             onClick={() => goToWeek(-7)}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
           >
             ‹ Prejšnji teden
           </button>
           <button
             type="button"
             onClick={goToday}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
           >
             Danes
           </button>
           <button
             type="button"
             onClick={() => goToWeek(7)}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
           >
             Naslednji teden ›
           </button>
@@ -299,7 +310,7 @@ export function ReservationCalendar({
                   setSelected(null);
                   setDeleteError(null);
                 }}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
               >
                 Zapri
               </button>
@@ -369,7 +380,7 @@ export function ReservationCalendar({
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
               >
                 Prekliči
               </button>

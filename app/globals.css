@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Brez tega Tailwind v4 privzeto uporabi SAMO @media (prefers-color-scheme), ne pa razreda "dark"
+   na <html>, ki ga preklaplja ThemeToggle -- posledica: gumb za temo ni imel nobenega vidnega učinka. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

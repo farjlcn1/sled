@@ -136,6 +136,7 @@ export function VehicleHistoryTable({
   // Auto-scroll ob vlečenju blizu zgornjega/spodnjega roba scrollable vsebnika (glej efekt spodaj).
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const autoScrollDirRef = useRef<0 | 1 | -1>(0);
+  const autoScrollSpeedRef = useRef(0);
   const lastMouseRef = useRef({ x: 0, y: 0 });
   const autoScrollRafRef = useRef<number | null>(null);
 
@@ -174,13 +175,33 @@ export function VehicleHistoryTable({
   }, []);
 
   // Ko uporabnik vleče izbiro blizu zgornjega/spodnjega roba scrollable tabele, samodejno scrollamo
-  // v to smer, dokler se kurzor ne odmakne od roba ali uporabnik ne spusti miškinega gumba — tudi
+  // v to smer, dokler se uporabnik ne vrne stran od roba ali ne spusti miškinega gumba — tudi
   // če miška medtem miruje (zato rAF zanka, ne le mousemove: vsebina se premika pod nepremičnim
   // kurzorjem, zato se mouseenter ne bo zanesljivo sprožil sam in vrstico pod kurzorjem moramo
   // na vsak frame poiskati ročno prek document.elementFromPoint).
+  // Deluje čez cel zaslon (ne samo tik ob robu tabele): karkoli nad tabelo scrolla navzgor,
+  // karkoli pod njo navzdol, hitrost pa narašča, dokler ne prideš do konca zaslona.
   useEffect(() => {
-    const EDGE_PX = 48;
-    const SCROLL_STEP_PX = 10;
+    const EDGE_PX = 48; // cona tik znotraj tabele, kjer se ze zacne scrollati
+    const MIN_SPEED = 10;
+    const MAX_SPEED = 60;
+    const MAX_DISTANCE_PX = 400; // razdalja od roba tabele do zaslona, pri kateri dosezemo MAX_SPEED
+
+    function computeScroll(clientY: number, rect: DOMRect, atTop: boolean, atBottom: boolean): { dir: 0 | 1 | -1; speed: number } {
+      if (clientY < rect.top) {
+        if (atTop) return { dir: 0, speed: 0 };
+        const dist = rect.top - clientY;
+        return { dir: -1, speed: MIN_SPEED + (MAX_SPEED - MIN_SPEED) * Math.min(dist / MAX_DISTANCE_PX, 1) };
+      }
+      if (clientY > rect.bottom) {
+        if (atBottom) return { dir: 0, speed: 0 };
+        const dist = clientY - rect.bottom;
+        return { dir: 1, speed: MIN_SPEED + (MAX_SPEED - MIN_SPEED) * Math.min(dist / MAX_DISTANCE_PX, 1) };
+      }
+      if (clientY - rect.top < EDGE_PX && !atTop) return { dir: -1, speed: MIN_SPEED };
+      if (rect.bottom - clientY < EDGE_PX && !atBottom) return { dir: 1, speed: MIN_SPEED };
+      return { dir: 0, speed: 0 };
+    }
 
     function runAutoScrollStep() {
       autoScrollRafRef.current = null;
@@ -188,7 +209,7 @@ export function VehicleHistoryTable({
       const container = scrollContainerRef.current;
       if (!draggingRef.current || autoScrollDirRef.current === 0 || !container) return;
 
-      container.scrollTop += autoScrollDirRef.current * SCROLL_STEP_PX;
+      container.scrollTop += autoScrollDirRef.current * autoScrollSpeedRef.current;
 
       const { x, y } = lastMouseRef.current;
       const el = document.elementFromPoint(x, y);
@@ -225,15 +246,10 @@ export function VehicleHistoryTable({
       const atTop = container.scrollTop <= 1;
       const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
 
-      if (e.clientY >= rect.top && e.clientY - rect.top < EDGE_PX && !atTop) {
-        autoScrollDirRef.current = -1;
-        ensureAutoScrollLoop();
-      } else if (e.clientY <= rect.bottom && rect.bottom - e.clientY < EDGE_PX && !atBottom) {
-        autoScrollDirRef.current = 1;
-        ensureAutoScrollLoop();
-      } else {
-        autoScrollDirRef.current = 0;
-      }
+      const { dir, speed } = computeScroll(e.clientY, rect, atTop, atBottom);
+      autoScrollDirRef.current = dir;
+      autoScrollSpeedRef.current = speed;
+      if (dir !== 0) ensureAutoScrollLoop();
     }
 
     window.addEventListener("mousemove", handleWindowMouseMove);

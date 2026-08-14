@@ -3,14 +3,25 @@
 import { REPORT_TYPE_OPTIONS } from "@/lib/report-type-options";
 import { SlovenianDateInput } from "@/components/date-input";
 
+// d.toISOString() vrne UTC datum, d.setDate/getDate pa delata v lokalnem času -- v Ljubljani
+// (UTC+2) lokalna polnoč pade na 22:00 UTC PREJŠNJEGA dne, zato bi toISOString().slice(0,10) tu
+// vrnil dan prej kot je dejansko mišljeno. Za "lokalni koledarski dan" sestavimo niz iz lokalnih
+// komponent, ne iz UTC.
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function defaultFrom() {
   const d = new Date();
   d.setDate(d.getDate() - 7);
-  return d.toISOString().slice(0, 10) + "T00:00";
+  return localDateStr(d) + "T00:00";
 }
 
 function defaultTo() {
-  return new Date().toISOString().slice(0, 10) + "T23:59";
+  return localDateStr(new Date()) + "T23:59";
 }
 
 export function ReportForm({

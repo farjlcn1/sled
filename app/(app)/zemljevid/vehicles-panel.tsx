@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VehicleMap, type HistoryRoute } from "@/components/vehicle-map";
+import { SlovenianDateInput } from "@/components/date-input";
 import type { VehicleIcon } from "@/app/api/pozicije/route";
 import type { HistoryRow } from "@/lib/history-data";
 import type { VehicleStatus } from "@/lib/vehicle-status";
@@ -58,11 +59,11 @@ type ContextMenuTarget =
 function defaultFrom() {
   const d = new Date();
   d.setDate(d.getDate() - 7);
-  return d.toISOString().slice(0, 10);
+  return `${d.toISOString().slice(0, 10)}T00:00`;
 }
 
 function defaultTo() {
-  return new Date().toISOString().slice(0, 10);
+  return `${new Date().toISOString().slice(0, 10)}T23:59`;
 }
 
 function tabClass(active: boolean) {
@@ -369,23 +370,11 @@ export function VehiclesPanel({
                 <div className="flex gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Od</label>
-                    <input
-                      type="date"
-                      name="from"
-                      defaultValue={defaultFrom()}
-                      required
-                      className="mt-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                    />
+                    <SlovenianDateInput name="from" withTime required defaultValue={defaultFrom()} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Do</label>
-                    <input
-                      type="date"
-                      name="to"
-                      defaultValue={defaultTo()}
-                      required
-                      className="mt-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                    />
+                    <SlovenianDateInput name="to" withTime required defaultValue={defaultTo()} />
                   </div>
                 </div>
                 <div className="flex justify-end gap-2">

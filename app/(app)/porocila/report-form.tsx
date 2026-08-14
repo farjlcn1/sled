@@ -1,15 +1,16 @@
 "use client";
 
 import { REPORT_TYPE_OPTIONS } from "@/lib/report-type-options";
+import { SlovenianDateInput } from "@/components/date-input";
 
 function defaultFrom() {
   const d = new Date();
   d.setDate(d.getDate() - 7);
-  return d.toISOString().slice(0, 10);
+  return d.toISOString().slice(0, 10) + "T00:00";
 }
 
 function defaultTo() {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toISOString().slice(0, 10) + "T23:59";
 }
 
 export function ReportForm({
@@ -77,21 +78,11 @@ export function ReportForm({
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Od</label>
-        <input
-          type="date"
-          name="from"
-          defaultValue={from ?? defaultFrom()}
-          className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        />
+        <SlovenianDateInput name="from" withTime defaultValue={from ?? defaultFrom()} />
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Do</label>
-        <input
-          type="date"
-          name="to"
-          defaultValue={to ?? defaultTo()}
-          className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        />
+        <SlovenianDateInput name="to" withTime defaultValue={to ?? defaultTo()} />
       </div>
       <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">
         Prikaži poročilo

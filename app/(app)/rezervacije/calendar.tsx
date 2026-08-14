@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { SlovenianDateInput } from "@/components/date-input";
 import { createReservation, deleteReservation, type ReservationState } from "./actions";
 
 const PALETTE = [
@@ -348,20 +349,18 @@ export function ReservationCalendar({
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Od
-                <input
-                  type="datetime-local"
+                <SlovenianDateInput
+                  withTime
                   required
-                  className={fieldClass()}
-                  onChange={(e) => setStartAtIso(localDateTimeToIso(e.target.value))}
+                  onValueChange={(v) => setStartAtIso(localDateTimeToIso(v))}
                 />
               </label>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Do
-                <input
-                  type="datetime-local"
+                <SlovenianDateInput
+                  withTime
                   required
-                  className={fieldClass()}
-                  onChange={(e) => setEndAtIso(localDateTimeToIso(e.target.value))}
+                  onValueChange={(v) => setEndAtIso(localDateTimeToIso(v))}
                 />
               </label>
             </div>

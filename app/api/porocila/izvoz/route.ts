@@ -13,6 +13,14 @@ import {
   type ReportType,
 } from "@/lib/report-types";
 
+// Če "do" nima izrecno nastavljene ure (privzeta polnoč ob izbiri samo dneva), ga obravnavamo
+// kot vključno do konca tega dne — sicer bi izbira samo dneva brez ure izključila skoraj ves dan.
+function inclusiveEnd(value: string): Date {
+  const d = new Date(value);
+  if (d.getHours() === 0 && d.getMinutes() === 0) d.setHours(23, 59, 59, 999);
+  return d;
+}
+
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
@@ -193,7 +201,7 @@ export async function GET(req: Request) {
   const toParam = url.searchParams.get("to");
 
   const fromDate = fromParam ? new Date(fromParam) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const toDate = toParam ? new Date(new Date(toParam).getTime() + 24 * 60 * 60 * 1000 - 1) : new Date();
+  const toDate = toParam ? inclusiveEnd(toParam) : new Date();
   const periodSuffix = `${fromParam ?? fromDate.toISOString().slice(0, 10)}_${toParam ?? toDate.toISOString().slice(0, 10)}`;
 
   const workbook = new ExcelJS.Workbook();

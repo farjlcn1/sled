@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { completePotniNalog, suggestFromGps } from "./actions";
 import type { GpsSuggestion } from "@/lib/potni-nalog";
+import { SlovenianDateInput } from "@/components/date-input";
 
 const inputClass =
   "mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
@@ -75,24 +76,22 @@ export function CompleteDialog({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Dejanski odhod</label>
-                <input
-                  type="datetime-local"
+                <SlovenianDateInput
                   name="actualDepartureAt"
+                  withTime
                   required
                   defaultValue={toLocalInput(suggestion?.actualDepartureAt ?? plannedDepartureAt)}
                   key={`dep-${suggestion?.actualDepartureAt ?? ""}`}
-                  className={inputClass}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Dejanska vrnitev</label>
-                <input
-                  type="datetime-local"
+                <SlovenianDateInput
                   name="actualReturnAt"
+                  withTime
                   required
                   defaultValue={toLocalInput(suggestion?.actualReturnAt ?? plannedReturnAt)}
                   key={`ret-${suggestion?.actualReturnAt ?? ""}`}
-                  className={inputClass}
                 />
               </div>
               <div>

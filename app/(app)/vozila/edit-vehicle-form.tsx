@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect } from "react";
 import { updateVehicle } from "./actions";
+import { SlovenianDateInput } from "@/components/date-input";
 
 const ICON_OPTIONS: { value: string; label: string }[] = [
   { value: "CAR", label: "Osebno vozilo" },
@@ -96,20 +97,16 @@ export function EditVehicleForm({
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Datum registracije
-            <input
+            <SlovenianDateInput
               name="registrationDate"
-              type="date"
               defaultValue={vehicle.registrationDate ? vehicle.registrationDate.slice(0, 10) : ""}
-              className={fieldClass()}
             />
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Naslednji servis (datum)
-            <input
+            <SlovenianDateInput
               name="nextServiceDate"
-              type="date"
               defaultValue={vehicle.nextServiceDate ? vehicle.nextServiceDate.slice(0, 10) : ""}
-              className={fieldClass()}
             />
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">

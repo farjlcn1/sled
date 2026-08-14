@@ -2,8 +2,16 @@ import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { vehicleWhereForUser } from "@/lib/vehicle-access";
 import { VehiclesPanel, type SelectionData } from "./vehicles-panel";
-import { computeHistoryRows, endOfDay, type HistoryRow } from "@/lib/history-data";
+import { computeHistoryRows, type HistoryRow } from "@/lib/history-data";
 import { deriveVehicleStatus, type VehicleStatus } from "@/lib/vehicle-status";
+
+// Če "do" nima izrecno nastavljene ure (privzeta polnoč ob izbiri samo dneva), ga obravnavamo
+// kot vključno do konca tega dne — sicer bi izbira samo dneva brez ure izključila skoraj ves dan.
+function inclusiveEnd(value: string): Date {
+  const d = new Date(value);
+  if (d.getHours() === 0 && d.getMinutes() === 0) d.setHours(23, 59, 59, 999);
+  return d;
+}
 
 export default async function ZemljevidPage({
   searchParams,
@@ -40,7 +48,7 @@ export default async function ZemljevidPage({
   let selections: Selection[] = [];
   if (selectedVehicles.length > 0 && from && to) {
     const fromDate = new Date(from);
-    const toDate = endOfDay(to);
+    const toDate = inclusiveEnd(to);
 
     selections = await Promise.all(
       selectedVehicles.map(async (vehicle): Promise<Selection> => {

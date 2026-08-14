@@ -1,7 +1,16 @@
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
+import { SlovenianDateInput } from "@/components/date-input";
 import { AuditLogTable, ACTION_LABELS, ENTITY_LABELS, type AuditLogRow } from "./audit-log-table";
+
+// Ce "do" nima izrecno nastavljene ure (privzeta polnoč ob izbiri samo dneva), ga obravnavamo
+// kot vključno do konca tega dne — sicer bi izbira samo dneva brez ure izključila skoraj ves dan.
+function inclusiveEnd(value: string): Date {
+  const d = new Date(value);
+  if (d.getHours() === 0 && d.getMinutes() === 0) d.setHours(23, 59, 59, 999);
+  return d;
+}
 
 function formatChangesSummary(changesJson: string | null): string | null {
   if (!changesJson) return null;
@@ -29,11 +38,7 @@ export default async function RevizijskaSledPage({
   if (filters.from || filters.to) {
     where.createdAt = {};
     if (filters.from) where.createdAt.gte = new Date(filters.from);
-    if (filters.to) {
-      const to = new Date(filters.to);
-      to.setHours(23, 59, 59, 999);
-      where.createdAt.lte = to;
-    }
+    if (filters.to) where.createdAt.lte = inclusiveEnd(filters.to);
   }
 
   const events = await prisma.auditLog.findMany({
@@ -88,11 +93,11 @@ export default async function RevizijskaSledPage({
         </label>
         <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
           Od
-          <input type="date" name="from" defaultValue={filters.from} className={`w-full ${selectClass}`} />
+          <SlovenianDateInput name="from" withTime defaultValue={filters.from} />
         </label>
         <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
           Do
-          <input type="date" name="to" defaultValue={filters.to} className={`w-full ${selectClass}`} />
+          <SlovenianDateInput name="to" withTime defaultValue={filters.to} />
         </label>
         <div className="col-span-2 flex items-end gap-2 sm:col-span-5">
           <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">

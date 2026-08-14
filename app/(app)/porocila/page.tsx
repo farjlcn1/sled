@@ -17,6 +17,14 @@ import { FuelDropsTable, FuelReadingsTable } from "./gorivo-tables";
 import { OverspeedTable, TripSpeedsTable } from "./hitrost-tables";
 import { VseTable } from "./vse-table";
 
+// Če "do" nima izrecno nastavljene ure (privzeta polnoč ob izbiri samo dneva), ga obravnavamo
+// kot vključno do konca tega dne — sicer bi izbira samo dneva brez ure izključila skoraj ves dan.
+function inclusiveEnd(value: string): Date {
+  const d = new Date(value);
+  if (d.getHours() === 0 && d.getMinutes() === 0) d.setHours(23, 59, 59, 999);
+  return d;
+}
+
 function Tile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-gray-200 p-3 dark:border-gray-700">
@@ -248,7 +256,7 @@ export default async function PorocilaPage({
   ]);
 
   const fromDate = from ? new Date(from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const toDate = to ? new Date(new Date(to).getTime() + 24 * 60 * 60 * 1000 - 1) : new Date();
+  const toDate = to ? inclusiveEnd(to) : new Date();
 
   let reports: VehicleReportResult[] = [];
   let fuelTankByPlate = new Map<string, number | null>();

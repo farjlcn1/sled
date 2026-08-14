@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { createPotniNalog } from "./actions";
 import { AddressCombobox } from "./address-combobox";
+import { SlovenianDateInput } from "@/components/date-input";
 
 const inputClass =
   "mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
@@ -81,11 +82,11 @@ export function NalogForm({
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Planiran odhod</label>
-          <input type="datetime-local" name="plannedDepartureAt" required className={inputClass} />
+          <SlovenianDateInput name="plannedDepartureAt" withTime required />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Planirana vrnitev</label>
-          <input type="datetime-local" name="plannedReturnAt" required className={inputClass} />
+          <SlovenianDateInput name="plannedReturnAt" withTime required />
         </div>
       </div>
 

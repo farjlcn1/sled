@@ -112,6 +112,8 @@ export function VehicleMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const outerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  const resizeDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const markersRef = useRef<Map<string, Marker>>(new Map());
   const historyMarkersRef = useRef<Marker[]>([]);
   const prevRouteCountRef = useRef(0);
@@ -157,8 +159,8 @@ export function VehicleMap({
   }, []);
 
   // MapLibre GL JS sam ne zazna spremembe CSS velikosti svojega vsebnika — canvas je treba ob
-  // vsaki spremembi velikosti (npr. ročno raztegovanje z resize-y ročico) eksplicitno ponovno
-  // umeriti z map.resize(), sicer ostane po raztegu videti pokvarjen (napačna velikost/prazna polja).
+  // vsaki spremembi velikosti (npr. ročno raztegovanje spodaj) eksplicitno ponovno umeriti z
+  // map.resize(), sicer ostane po raztegu videti pokvarjen (napačna velikost/prazna polja).
   useEffect(() => {
     if (!outerRef.current) return;
 
@@ -171,6 +173,35 @@ export function VehicleMap({
       observer.disconnect();
     };
   }, []);
+
+  // Ročica za spremembo višine spodaj (glej JSX) — nativna CSS "resize" lastnost se je izkazala za
+  // nezanesljivo, ker MapLibrov lastni "attribution" kontrolnik sedi točno v spodnjem desnem kotu
+  // in prestreza klike, namenjene brskalnikovi kljuki za raztegovanje. Zato višino upravljamo sami.
+  useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      const drag = resizeDragRef.current;
+      if (!drag) return;
+      const next = Math.max(320, drag.startHeight + (e.clientY - drag.startY));
+      setHeight(next);
+    }
+    function handleMouseUp() {
+      resizeDragRef.current = null;
+    }
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  function handleResizeHandleMouseDown(e: React.MouseEvent) {
+    e.preventDefault();
+    resizeDragRef.current = {
+      startY: e.clientY,
+      startHeight: outerRef.current?.getBoundingClientRect().height ?? 520,
+    };
+  }
 
   // Riše celotno pot naložene zgodovine + ikono vozila z registrsko na najnovejši poziciji.
   // addSource/addLayer lahko vržeta izjemo, ce slog zemljevida se ni v celoti pripravljen —
@@ -390,7 +421,10 @@ export function VehicleMap({
   return (
     <div
       ref={outerRef}
-      className="relative h-[75vh] min-h-[520px] w-full resize-y overflow-hidden rounded-md border border-gray-200 dark:border-gray-700"
+      className={`relative w-full overflow-hidden rounded-md border border-gray-200 dark:border-gray-700 ${
+        height === null ? "h-[75vh] min-h-[520px]" : ""
+      }`}
+      style={height !== null ? { height, minHeight: 320 } : undefined}
     >
       <div ref={containerRef} className="h-full w-full" />
       {(error || routeError) && (
@@ -398,6 +432,13 @@ export function VehicleMap({
           {error ?? routeError}
         </p>
       )}
+      <div
+        onMouseDown={handleResizeHandleMouseDown}
+        title="Povleci za spremembo velikosti zemljevida"
+        className="absolute inset-x-0 bottom-0 z-20 flex h-3 cursor-ns-resize items-center justify-center hover:bg-black/10 dark:hover:bg-white/10"
+      >
+        <div className="h-1 w-10 rounded-full bg-gray-400/80 dark:bg-gray-300/70" />
+      </div>
       <style jsx global>{`
         .vehicle-marker {
           display: flex;

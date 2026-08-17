@@ -13,12 +13,21 @@ const ICON_OPTIONS: { value: string; label: string }[] = [
   { value: "MOTORCYCLE", label: "Motor" },
 ];
 
+const PROTOCOL_LABELS: Record<string, string> = { TELTONIKA: "Teltonika", OTHER: "Drugo" };
+
+function deviceOptionLabel(d: { imei: string; protocol: string; brand: string | null; model: string | null }): string {
+  const type = [PROTOCOL_LABELS[d.protocol] ?? d.protocol, [d.brand, d.model].filter(Boolean).join(" ") || null]
+    .filter(Boolean)
+    .join(" ");
+  return type ? `${d.imei} — ${type}` : d.imei;
+}
+
 export function AddVehicleForm({
   availableDevices,
   groups,
   tenantId,
 }: {
-  availableDevices: { id: string; imei: string }[];
+  availableDevices: { id: string; imei: string; protocol: string; brand: string | null; model: string | null }[];
   groups: { id: string; name: string }[];
   tenantId?: string;
 }) {
@@ -100,7 +109,7 @@ export function AddVehicleForm({
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Naprava (IMEI)</label>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Naprava (IMEI in tip)</label>
         <select
           name="deviceId"
           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
@@ -108,7 +117,7 @@ export function AddVehicleForm({
           <option value="">— brez naprave —</option>
           {availableDevices.map((d) => (
             <option key={d.id} value={d.id}>
-              {d.imei}
+              {deviceOptionLabel(d)}
             </option>
           ))}
         </select>

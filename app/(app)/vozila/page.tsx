@@ -10,7 +10,10 @@ async function loadTenantData(tenantId: string) {
       orderBy: { plate: "asc" },
       include: { currentDriver: true, groupMemberships: { include: { group: true } }, device: true },
     }),
-    prisma.device.findMany({ where: { tenantId, vehicle: null }, select: { id: true, imei: true } }),
+    prisma.device.findMany({
+      where: { tenantId, vehicle: null },
+      select: { id: true, imei: true, protocol: true, brand: true, model: true },
+    }),
     prisma.vehicleGroup.findMany({
       where: { tenantId },
       orderBy: { name: "asc" },
@@ -56,6 +59,9 @@ export default async function VozilaPage({
     note: v.note,
     deviceId: v.deviceId,
     deviceImei: v.device?.imei ?? null,
+    deviceProtocol: v.device?.protocol ?? null,
+    deviceBrand: v.device?.brand ?? null,
+    deviceModel: v.device?.model ?? null,
     registrationDate: v.registrationDate ? v.registrationDate.toISOString() : null,
     nextServiceDate: v.nextServiceDate ? v.nextServiceDate.toISOString() : null,
     nextServiceKm: v.nextServiceKm,

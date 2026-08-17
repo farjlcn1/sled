@@ -24,6 +24,9 @@ export type VehicleRow = {
   note: string | null;
   deviceId: string | null;
   deviceImei: string | null;
+  deviceProtocol: string | null;
+  deviceBrand: string | null;
+  deviceModel: string | null;
   registrationDate: string | null;
   nextServiceDate: string | null;
   nextServiceKm: number | null;
@@ -74,13 +77,15 @@ function compare(a: string | number, b: string | number): number {
   return String(a).localeCompare(String(b), "sl-SI", { numeric: true });
 }
 
+export type AvailableDevice = { id: string; imei: string; protocol: string; brand: string | null; model: string | null };
+
 export function VehiclesTable({
   vehicles,
   availableDevices,
   canBulkDelete,
 }: {
   vehicles: VehicleRow[];
-  availableDevices: { id: string; imei: string }[];
+  availableDevices: AvailableDevice[];
   canBulkDelete: boolean;
 }) {
   const [sort, setSort] = useState<{ key: ColumnKey; dir: SortDir } | null>(null);
@@ -142,8 +147,18 @@ export function VehiclesTable({
   const editingDeviceOptions = editingVehicle
     ? [
         ...availableDevices,
+        // Trenutno dodeljena naprava ne bo v availableDevices (tisti seznam vsebuje samo proste
+        // naprave, glej vozila/page.tsx) -- brez tega bi bila možnost izbire prazna/manjkajoča.
         ...(editingVehicle.deviceId && !availableDevices.some((d) => d.id === editingVehicle.deviceId)
-          ? [{ id: editingVehicle.deviceId, imei: editingVehicle.deviceId }]
+          ? [
+              {
+                id: editingVehicle.deviceId,
+                imei: editingVehicle.deviceImei ?? editingVehicle.deviceId,
+                protocol: editingVehicle.deviceProtocol ?? "OTHER",
+                brand: editingVehicle.deviceBrand,
+                model: editingVehicle.deviceModel,
+              },
+            ]
           : []),
       ]
     : availableDevices;

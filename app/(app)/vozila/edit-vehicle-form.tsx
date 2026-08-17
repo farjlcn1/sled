@@ -13,6 +13,15 @@ const ICON_OPTIONS: { value: string; label: string }[] = [
   { value: "MOTORCYCLE", label: "Motor" },
 ];
 
+const PROTOCOL_LABELS: Record<string, string> = { TELTONIKA: "Teltonika", OTHER: "Drugo" };
+
+function deviceOptionLabel(d: { imei: string; protocol: string; brand: string | null; model: string | null }): string {
+  const type = [PROTOCOL_LABELS[d.protocol] ?? d.protocol, [d.brand, d.model].filter(Boolean).join(" ") || null]
+    .filter(Boolean)
+    .join(" ");
+  return type ? `${d.imei} — ${type}` : d.imei;
+}
+
 export type EditableVehicle = {
   id: string;
   plate: string;
@@ -38,7 +47,7 @@ export function EditVehicleForm({
   onClose,
 }: {
   vehicle: EditableVehicle;
-  availableDevices: { id: string; imei: string }[];
+  availableDevices: { id: string; imei: string; protocol: string; brand: string | null; model: string | null }[];
   onClose: () => void;
 }) {
   const boundUpdate = updateVehicle.bind(null, vehicle.id);
@@ -121,12 +130,12 @@ export function EditVehicleForm({
             />
           </label>
           <label className="col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Naprava (IMEI)
+            Naprava (IMEI in tip)
             <select name="deviceId" defaultValue={vehicle.deviceId ?? ""} className={fieldClass()}>
               <option value="">— brez naprave —</option>
               {availableDevices.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.imei}
+                  {deviceOptionLabel(d)}
                 </option>
               ))}
             </select>

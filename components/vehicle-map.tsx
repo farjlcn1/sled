@@ -24,6 +24,13 @@ const STATUS_COLOR: Record<VehicleStatus, string> = {
   unknown: "#6b7280",
 };
 
+const STATUS_TEXT: Record<VehicleStatus, string> = {
+  driving: "V vožnji",
+  idle: "Kontakt vklopljen",
+  parked: "Kontakt izklopljen",
+  unknown: "Neznano",
+};
+
 export type HistoryRoute = {
   path: [number, number][];
   plate: string;
@@ -281,7 +288,9 @@ export function VehicleMap({
 
       declutterMarkers(map, [...markersRef.current.values(), ...historyMarkersRef.current]);
 
-      if (bounds) map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 300 });
+      // maxZoom omeji, kako blizu se približa za majhen/mirujoč niz točk (npr. eno samo parkirano
+      // vozilo) -- 14 je bilo pretesno (skoraj ulična raven), 12 pusti več okoliškega konteksta.
+      if (bounds) map.fitBounds(bounds, { padding: 60, maxZoom: 12, duration: 300 });
 
       // Izbrane vrstice v tabeli zgodovine spodaj — narisano nad vsem ostalim, ne vpliva na fitBounds
       // (izbira vrstice naj ne premika/zoomira zemljevida).
@@ -405,7 +414,13 @@ export function VehicleMap({
         strong.textContent = pos.plate;
         popupEl.appendChild(strong);
         popupEl.appendChild(document.createElement("br"));
-        popupEl.appendChild(document.createTextNode(`${Math.round(pos.speed)} km/h`));
+        popupEl.appendChild(document.createTextNode(`${Math.round(pos.speed)} km/h — ${STATUS_TEXT[pos.status]}`));
+        popupEl.appendChild(document.createElement("br"));
+        popupEl.appendChild(
+          document.createTextNode(
+            `Zadnja meritev: ${new Date(pos.fixTime).toLocaleTimeString("sl-SI", { hour: "2-digit", minute: "2-digit" })}`
+          )
+        );
         marker.getPopup()?.setDOMContent(popupEl);
       }
 
@@ -503,6 +518,20 @@ export function VehicleMap({
           padding: 1px 5px;
           border-radius: 4px;
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+        }
+        /* MapLibrov privzeti pojavni oblaček podeduje barvo besedila od strani (temni način jo
+           postavi zelo svetlo), ozadje pa ostane MapLibrovo lastno belo -- brez tega je besedilo
+           komaj vidno. Enako kot zgoraj: neodvisno od trenutne teme strani. */
+        .maplibregl-popup-content {
+          background: white;
+          color: #111827;
+          font-size: 12px;
+          line-height: 1.5;
+          padding: 10px 12px;
+          border-radius: 6px;
+        }
+        .maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+          border-top-color: white;
         }
       `}</style>
     </div>

@@ -10,6 +10,7 @@ import type { VehicleStatus } from "@/lib/vehicle-status";
 import { VehicleRow } from "./vehicle-row";
 import { GroupRow } from "./group-row";
 import { VehicleHistoryTable } from "./vehicle-history-table";
+import { TodaySummaryPanel } from "./today-summary-panel";
 
 // Mora ustrezati VehicleMap-ovi lastni (trenutno fiksni) višini spodaj, da se stranski
 // seznam navidezno "razteza" na enako višino kot zemljevid, ko je vozil dovolj za scroll.
@@ -102,6 +103,8 @@ export function VehiclesPanel({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; target: ContextMenuTarget } | null>(null);
   const [dialogTarget, setDialogTarget] = useState<{ ids: string[]; label: string } | null>(null);
   const [pointSelection, setPointSelection] = useState<Record<string, Set<number>>>({});
+  // Zadnje kliknjeno (odkljukano) vozilo -- zanj prikažemo "Danes" podokno desno od zemljevida.
+  const [focusedVehicleId, setFocusedVehicleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -126,6 +129,7 @@ export function VehiclesPanel({
       } else {
         next.add(id);
         quickLoadHistory(id);
+        setFocusedVehicleId(id);
       }
       return next;
     });
@@ -272,10 +276,11 @@ export function VehiclesPanel({
     .filter((path) => path.length > 0);
 
   const vehiclesById = new Map(vehicles.map((v) => [v.id, v]));
+  const focusedVehicle = focusedVehicleId ? (vehiclesById.get(focusedVehicleId) ?? null) : null;
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[360px_1fr]">
+      <div className={`grid grid-cols-1 gap-4 ${focusedVehicle ? "lg:grid-cols-[360px_1fr_300px]" : "lg:grid-cols-[360px_1fr]"}`}>
         <div
           className="relative self-start overflow-x-auto overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700"
           style={{ maxHeight: SIDEBAR_MAX_HEIGHT }}
@@ -468,6 +473,8 @@ export function VehiclesPanel({
         </div>
 
         <VehicleMap visibleVehicleIds={checkedIds} historyRoutes={historyRoutes} highlightPaths={highlightPaths} />
+
+        {focusedVehicle && <TodaySummaryPanel vehicleId={focusedVehicle.id} plate={focusedVehicle.plate} />}
       </div>
 
       {selections.map((s) => (

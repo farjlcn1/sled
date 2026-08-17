@@ -1,0 +1,10 @@
+[Unit]
+Description=Posodobitev gps.farjolcn.com DDNS zapisa (Cloudflare)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+LoadCredential=cf-token:/etc/sledenje-ddns/cloudflare-token
+ExecStart=/usr/bin/python3 /opt/sledenje-ddns/ddns-update.py

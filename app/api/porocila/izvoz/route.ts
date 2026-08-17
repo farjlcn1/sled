@@ -229,6 +229,27 @@ export async function GET(req: Request) {
       addVehicleSheet(workbook, vehicle.plate, report, reportType, vehicle.fuelTankVolumeL);
     }
     downloadName = `porocilo-${(group?.name ?? "skupina").replace(/[^a-zA-Z0-9-_]+/g, "-")}-${periodSuffix}.xlsx`;
+  } else if (vehicleId === "__all__") {
+    const allVehicles = await prisma.vehicle.findMany({
+      where: { ...vehicleWhereForUser(user), device: { isNot: null } },
+      orderBy: { plate: "asc" },
+      select: {
+        id: true,
+        plate: true,
+        minStopDurationMin: true,
+        minMovingSpeedKmh: true,
+        fuelTankVolumeL: true,
+        device: { select: { traccarDeviceId: true } },
+      },
+    });
+    if (allVehicles.length === 0) {
+      return NextResponse.json({ error: "Ni dostopnih vozil." }, { status: 404 });
+    }
+    for (const vehicle of allVehicles) {
+      const report = await computeVehicleReport(vehicle, fromDate, toDate);
+      addVehicleSheet(workbook, vehicle.plate, report, reportType, vehicle.fuelTankVolumeL);
+    }
+    downloadName = `porocilo-vsa-vozila-${periodSuffix}.xlsx`;
   } else if (vehicleId) {
     const vehicle = await prisma.vehicle.findFirst({
       where: { id: vehicleId, ...vehicleWhereForUser(user) },

@@ -283,6 +283,14 @@ export default async function PorocilaPage({
       fuelTankByPlate = new Map(groupVehicles.map((v) => [v.plate, v.fuelTankVolumeL]));
       exportHref = `/api/porocila/izvoz?groupId=${groupId}&tip=${reportType}&from=${from ?? ""}&to=${to ?? ""}`;
     }
+  } else if (vehicleId === "__all__") {
+    if (vehicles.length === 0) {
+      rangeError = "Ni dostopnih vozil.";
+    } else {
+      reports = await Promise.all(vehicles.map((v) => computeVehicleReport(v, fromDate, toDate)));
+      fuelTankByPlate = new Map(vehicles.map((v) => [v.plate, v.fuelTankVolumeL]));
+      exportHref = `/api/porocila/izvoz?vehicleId=__all__&tip=${reportType}&from=${from ?? ""}&to=${to ?? ""}`;
+    }
   } else if (vehicleId) {
     const vehicle = vehicles.find((v) => v.id === vehicleId);
     if (!vehicle) {

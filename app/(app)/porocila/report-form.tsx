@@ -51,6 +51,7 @@ export function ReportForm({
           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         >
           <option value="">— brez —</option>
+          <option value="__all__">— vse —</option>
           {vehicles.map((v) => (
             <option key={v.id} value={v.id}>
               {v.plate}
@@ -99,7 +100,8 @@ export function ReportForm({
         Prikaži poročilo
       </button>
       <p className="w-full text-xs text-gray-500 dark:text-gray-400">
-        Izberi vozilo ALI skupino (če je izbrana skupina, se prikažejo podatki za vsa vozila v njej).
+        Izberi vozilo ALI skupino (če je izbrana skupina, se prikažejo podatki za vsa vozila v njej) —
+        ali "— vse —" za poročilo o vseh dostopnih vozilih.
       </p>
     </form>
   );

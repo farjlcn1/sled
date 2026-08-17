@@ -7,13 +7,7 @@ import { requireUser } from "@/lib/auth/session";
 import { diffFields, logAudit } from "@/lib/audit";
 import { generateStrongPassword, hashPassword, passwordSchema } from "@/lib/auth/password";
 import { isMailConfigured, sendMail } from "@/lib/mail";
-
-const LEVEL_PERMISSIONS = {
-  SUDO: { canManagePlatform: true, canManageUsers: true, canManageVehicles: true, canManageDrivers: true, canViewReports: true },
-  UP: { canManagePlatform: false, canManageUsers: true, canManageVehicles: true, canManageDrivers: true, canViewReports: true },
-  U: { canManagePlatform: false, canManageUsers: false, canManageVehicles: false, canManageDrivers: false, canViewReports: true },
-  DEMO: { canManagePlatform: false, canManageUsers: false, canManageVehicles: false, canManageDrivers: false, canViewReports: false },
-} as const;
+import { LEVEL_PERMISSIONS } from "@/lib/permissions";
 
 const userSchema = z.object({
   email: z.string().trim().email("Vnesi veljaven email."),
@@ -142,13 +136,12 @@ const editUserSchema = z.object({
 
 export type EditUserState = { error?: string; success?: boolean } | undefined;
 
-// Urejanje obstoječih uporabnikov (nivo, dostop do skupin/vozil, geslo): sudo lahko ureja vse,
-// UP lahko ureja samo uporabnike znotraj lastnega podjetja in ne more podeliti sudo nivoja.
+// Urejanje obstoječih uporabnikov (nivo, dostop do skupin/vozil, geslo) je omejeno na sudo.
 export async function updateUser(_prevState: EditUserState, formData: FormData): Promise<EditUserState> {
   const admin = await requireUser();
   const isSudo = admin.canManagePlatform && !admin.tenantId;
-  if (!admin.canManageUsers) {
-    return { error: "Nimaš dovoljenja za urejanje uporabnikov." };
+  if (!isSudo) {
+    return { error: "Samo administracija lahko ureja uporabnike." };
   }
 
   const parsed = editUserSchema.safeParse({
@@ -167,15 +160,6 @@ export async function updateUser(_prevState: EditUserState, formData: FormData):
     include: { vehicleAccess: true, vehicleGroupAccess: true },
   });
   if (!target) return { error: "Uporabnik ne obstaja." };
-
-  if (!isSudo) {
-    if (target.tenantId !== admin.tenantId) {
-      return { error: "Ni dovoljeno." };
-    }
-    if (parsed.data.level === "SUDO") {
-      return { error: "Samo administracija lahko podeli sudo nivo." };
-    }
-  }
 
   let tenantId: string | null;
   if (parsed.data.level === "SUDO") {

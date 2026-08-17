@@ -2,25 +2,12 @@ import { requireUser } from "@/lib/auth/session";
 import { LogoutButton } from "@/components/logout-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NavLinks } from "@/components/nav-links";
+import { NAV_TABS } from "@/lib/permissions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
 
-  const links = [
-    { href: "/zemljevid", label: "Zemljevid", show: true },
-    { href: "/vozila", label: "Vozila", show: user.canManageVehicles || user.canManagePlatform },
-    { href: "/skupine", label: "Skupine", show: user.canManageVehicles || user.canManagePlatform },
-    { href: "/rezervacije", label: "Rezervacija vozila", show: user.canManageVehicles || user.canManagePlatform },
-    { href: "/vozniki", label: "Vozniki", show: true },
-    { href: "/porocila", label: "Poročila", show: user.canViewReports },
-    { href: "/potni-nalogi", label: "Potni nalogi", show: user.canManageUsers },
-    { href: "/tacho", label: "Tacho", show: user.canManageUsers },
-    { href: "/uporabniki", label: "Uporabniki", show: user.canManageUsers },
-    { href: "/admin/naprave", label: "Naprave", show: user.canManagePlatform },
-    { href: "/admin/najemniki", label: "Podjetja", show: user.canManagePlatform },
-    { href: "/admin/paketi", label: "Paketi", show: user.canManagePlatform },
-    { href: "/revizijska-sled", label: "Revizijska sled", show: user.canManagePlatform },
-  ];
+  const links = NAV_TABS.map((tab) => ({ href: tab.href, label: tab.label, show: tab.show(user) }));
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

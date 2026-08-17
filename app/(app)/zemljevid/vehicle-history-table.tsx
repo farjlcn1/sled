@@ -174,6 +174,24 @@ export function VehicleHistoryTable({
     return () => window.removeEventListener("mouseup", stopDragging);
   }, []);
 
+  // Ctrl+A izbere vse vrstice TE tabele, ko je miška nad njo -- namesto privzetega izbiranja
+  // celotnega besedila strani. Ref, ker je efekt spodaj mount-only (isti razlog kot zgoraj).
+  const isHoveredRef = useRef(false);
+  const selectAllRef = useRef(() => {});
+  selectAllRef.current = () => onSelectedIndicesChange(new Set(rows.map((_, i) => i)));
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!isHoveredRef.current) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        selectAllRef.current();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Ko uporabnik vleče izbiro blizu zgornjega/spodnjega roba scrollable tabele, samodejno scrollamo
   // v to smer, dokler se uporabnik ne vrne stran od roba ali ne spusti miškinega gumba — tudi
   // če miška medtem miruje (zato rAF zanka, ne le mousemove: vsebina se premika pod nepremičnim
@@ -324,6 +342,12 @@ export function VehicleHistoryTable({
       ) : (
         <div
           ref={scrollContainerRef}
+          onMouseEnter={() => {
+            isHoveredRef.current = true;
+          }}
+          onMouseLeave={() => {
+            isHoveredRef.current = false;
+          }}
           className="max-h-[32rem] overflow-auto rounded-md border border-gray-200 dark:border-gray-700"
         >
           <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">

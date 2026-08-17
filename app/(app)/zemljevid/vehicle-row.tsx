@@ -21,6 +21,35 @@ function fmtDate(iso: string | null) {
   return iso ? new Date(iso).toLocaleDateString("sl-SI") : "—";
 }
 
+function FuelIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4 shrink-0">
+      <rect x="3" y="3" width="9" height="14" rx="1" />
+      <path d="M5 7h5" strokeLinecap="round" />
+      <path d="M12 7h2a1 1 0 0 1 1 1v6a1.5 1.5 0 0 0 3 0V9l-2-2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function OdometerIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4 shrink-0">
+      <path d="M3 14a7 7 0 1 1 14 0" strokeLinecap="round" />
+      <path d="M10 14l3-4" strokeLinecap="round" />
+      <circle cx="10" cy="14" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4 shrink-0">
+      <circle cx="10" cy="10" r="7" />
+      <path d="M10 6v4l3 2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function VehicleRow({
   vehicleId,
   plate,
@@ -36,8 +65,9 @@ export function VehicleRow({
   onToggleChecked,
   onContextMenu,
   onLoadHistory,
-  onCtrlDragStart,
-  onCtrlDragEnter,
+  onDragStart,
+  onDragEnter,
+  wasDragged,
 }: {
   vehicleId: string;
   plate: string;
@@ -53,10 +83,12 @@ export function VehicleRow({
   onToggleChecked: () => void;
   onContextMenu: (vehicleId: string, x: number, y: number) => void;
   onLoadHistory: (vehicleId: string, label: string) => void;
-  // Ctrl+klik-in-vlečenje čez več vrstic zajame vsa vozila vmes (glej vehicles-panel.tsx) --
-  // ločeno od navadnega klika, ki preklopi/razširi samo eno vozilo.
-  onCtrlDragStart?: (vehicleId: string) => void;
-  onCtrlDragEnter?: (vehicleId: string) => void;
+  // Klik-in-vlečenje čez več vrstic zajame vsa vozila vmes (glej vehicles-panel.tsx) -- ločeno od
+  // navadnega klika (brez premika), ki preklopi/razširi samo eno vozilo; wasDragged pove kateri
+  // je bil ob dvigu miškinega gumba.
+  onDragStart?: (vehicleId: string) => void;
+  onDragEnter?: (vehicleId: string) => void;
+  wasDragged?: () => boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<VehicleQuickStatus | null>(null);
@@ -95,22 +127,19 @@ export function VehicleRow({
     <tr
       onContextMenu={handleContextMenu}
       onMouseDown={(e) => {
-        if (e.detail > 1) e.preventDefault();
-        if (e.ctrlKey || e.metaKey) {
-          // Brez tega brskalnik ob vlečenju z Ctrl začne označevati besedilo (native selection),
-          // kar prevzame miškine dogodke namesto našega range-select mehanizma spodaj.
-          e.preventDefault();
-          onCtrlDragStart?.(vehicleId);
-        }
+        // preventDefault vedno -- brez tega brskalnik ob vlečenju začne označevati besedilo
+        // (native selection), kar bi prevzelo miškine dogodke namesto range-select mehanizma spodaj.
+        e.preventDefault();
+        onDragStart?.(vehicleId);
       }}
-      onMouseEnter={() => onCtrlDragEnter?.(vehicleId)}
-      title="Klik za prikaz na zemljevidu in podatke o vozilu, desni klik za zgodovino vožnje, ctrl+vlečenje za izbiro več vozil"
+      onMouseEnter={() => onDragEnter?.(vehicleId)}
+      title="Klik za prikaz na zemljevidu in podatke o vozilu, desni klik za zgodovino vožnje, klik in vlečenje za izbiro več vozil"
       className={isSelected ? "bg-blue-50 dark:bg-blue-950" : undefined}
     >
       <td
         colSpan={2}
-        onClick={(e) => {
-          if (e.ctrlKey || e.metaKey) return;
+        onClick={() => {
+          if (wasDragged?.()) return;
           handleToggle();
         }}
         role="checkbox"
@@ -225,27 +254,39 @@ export function VehicleRow({
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-500 dark:text-gray-400">{STATUS_LABEL[detail.status]}</span>
-                  <span className="text-gray-900 dark:text-gray-100">{formatDuration(detail.stateDurationMin)}</span>
-                </div>
-                <div>
                   <span className="text-gray-500 dark:text-gray-400">Ignition: </span>
                   <span className="text-gray-900 dark:text-gray-100">
                     {detail.ignition === null ? "—" : detail.ignition ? "Da" : "Ne"}
                   </span>
                 </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Odometer: </span>
-                  <span className="text-gray-900 dark:text-gray-100">{detail.odometer ?? "—"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Gorivo: </span>
-                  <span className="text-gray-900 dark:text-gray-100">
-                    {detail.fuel != null ? `${detail.fuel}%` : "—"}
-                  </span>
-                </div>
               </>
             )}
+          </div>
+        )}
+
+        {expanded && detail && (
+          <div className="mt-2 flex items-center justify-around gap-2 border-t border-gray-200 pt-2 dark:border-gray-700">
+            <div
+              className="flex items-center gap-1 text-gray-700 dark:text-gray-300"
+              title="Gorivo"
+            >
+              <FuelIcon />
+              <span className="text-xs">{detail.fuel != null ? `${detail.fuel}%` : "—"}</span>
+            </div>
+            <div
+              className="flex items-center gap-1 text-gray-700 dark:text-gray-300"
+              title="Odometer"
+            >
+              <OdometerIcon />
+              <span className="text-xs">{detail.odometer ?? "—"}</span>
+            </div>
+            <div
+              className="flex items-center gap-1 text-gray-700 dark:text-gray-300"
+              title={STATUS_LABEL[detail.status]}
+            >
+              <ClockIcon />
+              <span className="text-xs">{formatDuration(detail.stateDurationMin)}</span>
+            </div>
           </div>
         )}
       </td>

@@ -131,44 +131,56 @@ export function VehiclesPanel({
     });
   }
 
-  // Ctrl+klik-in-vlečenje čez vozila v seznamu zajame vsa vozila med začetno in trenutno vrstico
+  // Klik-in-vlečenje čez vozila v seznamu zajame vsa vozila med začetno in trenutno vrstico
   // (ne glede na trenutni zavihek Vozila/Skupine) -- ne prikaže/naloži ničesar samodejno kot
   // navaden klik, samo jih odkljuka, da je nato mogoče desni klik -> "Naloži zgodovino za N vozil".
-  const ctrlDragAnchorIdRef = useRef<string | null>(null);
-  const ctrlDragSnapshotRef = useRef<Set<string>>(new Set());
-  const ctrlDraggingRef = useRef(false);
+  // Razlika med "navaden klik" in "vlečenje" ni v Ctrlu, ampak v premiku: dokler miška ne vstopi
+  // v DRUGO vrstico, gre za navaden klik (glej dragMovedRef/wasDragged spodaj).
+  const dragAnchorIdRef = useRef<string | null>(null);
+  const dragSnapshotRef = useRef<Set<string>>(new Set());
+  const draggingRef = useRef(false);
+  const dragMovedRef = useRef(false);
 
-  function applyCtrlDragRange(currentId: string) {
-    const anchorId = ctrlDragAnchorIdRef.current;
+  function applyDragRange(currentId: string) {
+    const anchorId = dragAnchorIdRef.current;
     if (!anchorId) return;
     const anchorIdx = vehicles.findIndex((v) => v.id === anchorId);
     const currentIdx = vehicles.findIndex((v) => v.id === currentId);
     if (anchorIdx === -1 || currentIdx === -1) return;
     const lo = Math.min(anchorIdx, currentIdx);
     const hi = Math.max(anchorIdx, currentIdx);
-    const next = new Set(ctrlDragSnapshotRef.current);
+    const next = new Set(dragSnapshotRef.current);
     for (let i = lo; i <= hi; i++) next.add(vehicles[i].id);
     setCheckedIds(next);
   }
 
-  function handleCtrlDragStart(vehicleId: string) {
-    ctrlDraggingRef.current = true;
-    ctrlDragAnchorIdRef.current = vehicleId;
-    ctrlDragSnapshotRef.current = new Set(checkedIds);
-    applyCtrlDragRange(vehicleId);
+  function handleDragStart(vehicleId: string) {
+    draggingRef.current = true;
+    dragMovedRef.current = false;
+    dragAnchorIdRef.current = vehicleId;
+    dragSnapshotRef.current = new Set(checkedIds);
   }
 
-  function handleCtrlDragEnter(vehicleId: string) {
-    if (!ctrlDraggingRef.current) return;
-    applyCtrlDragRange(vehicleId);
+  function handleDragEnter(vehicleId: string) {
+    if (!draggingRef.current) return;
+    if (vehicleId !== dragAnchorIdRef.current) dragMovedRef.current = true;
+    if (dragMovedRef.current) applyDragRange(vehicleId);
+  }
+
+  // Kliče ga vrstica sama ob kliku, da ugotovi, ali je šlo za pravo vlečenje (in naj torej
+  // preskoči svoj navaden preklop/razširitev) -- takoj počisti zastavico za naslednjo kretnjo.
+  function consumeDragMoved(): boolean {
+    const moved = dragMovedRef.current;
+    dragMovedRef.current = false;
+    return moved;
   }
 
   useEffect(() => {
-    function stopCtrlDragging() {
-      ctrlDraggingRef.current = false;
+    function stopDragging() {
+      draggingRef.current = false;
     }
-    window.addEventListener("mouseup", stopCtrlDragging);
-    return () => window.removeEventListener("mouseup", stopCtrlDragging);
+    window.addEventListener("mouseup", stopDragging);
+    return () => window.removeEventListener("mouseup", stopDragging);
   }, []);
 
   const allChecked = vehicles.length > 0 && vehicles.every((v) => checkedIds.has(v.id));
@@ -322,8 +334,9 @@ export function VehiclesPanel({
                       isSelected={selectedVehicleIds.includes(v.id)}
                       checked={checkedIds.has(v.id)}
                       onToggleChecked={() => toggleChecked(v.id)}
-                      onCtrlDragStart={handleCtrlDragStart}
-                      onCtrlDragEnter={handleCtrlDragEnter}
+                      onDragStart={handleDragStart}
+                      onDragEnter={handleDragEnter}
+                      wasDragged={consumeDragMoved}
                       onContextMenu={(vehicleId, x, y) => setContextMenu({ target: { type: "vehicle", vehicleId }, x, y })}
                       onLoadHistory={(vehicleId, label) => openHistoryDialogForIds([vehicleId], label)}
                     />

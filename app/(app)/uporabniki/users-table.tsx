@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import { EditUserDialog } from "./edit-user-dialog";
 import { ToggleActiveButton } from "./toggle-active-button";
+import type { UserLevel } from "@/lib/permissions";
 
-type Level = "SUDO" | "UP" | "U" | "DEMO";
+type Level = UserLevel;
 
 const LEVEL_LABELS: Record<string, string> = {
   SUDO: "Sudo",

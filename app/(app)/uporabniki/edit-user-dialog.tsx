@@ -2,8 +2,9 @@
 
 import { useActionState, useState } from "react";
 import { updateUser } from "./actions";
+import { LEVEL_PERMISSIONS, NAV_TABS, type UserLevel } from "@/lib/permissions";
 
-type Level = "SUDO" | "UP" | "U" | "DEMO";
+type Level = UserLevel;
 
 const LEVEL_OPTIONS: { value: Level; label: string }[] = [
   { value: "SUDO", label: "Sudo — dostop do vsega" },
@@ -26,7 +27,11 @@ export function EditUserDialog({
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(updateUser, undefined);
   const [level, setLevel] = useState<Level>(targetUser.level);
-  const levelOptions = isSudo ? LEVEL_OPTIONS : LEVEL_OPTIONS.filter((o) => o.value !== "SUDO");
+
+  // Urejanje uporabnikov je omejeno na sudo (glej actions.ts) -- ta gumb/dialog se ostalim sploh ne prikaže.
+  if (!isSudo) return null;
+
+  const visibleTabLabels = NAV_TABS.filter((tab) => tab.show(LEVEL_PERMISSIONS[level])).map((tab) => tab.label);
 
   const showGroupAccess = level === "U";
   const showVehicleAccess = level === "U" || level === "DEMO";
@@ -62,12 +67,16 @@ export function EditUserDialog({
                 onChange={(e) => setLevel(e.target.value as Level)}
                 className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               >
-                {levelOptions.map((o) => (
+                {LEVEL_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
                 ))}
               </select>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Zavihki, ki jih bo uporabnik videl:{" "}
+                <span className="text-gray-700 dark:text-gray-300">{visibleTabLabels.join(", ")}</span>
+              </p>
             </div>
 
             <div>

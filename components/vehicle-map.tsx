@@ -85,6 +85,44 @@ function declutterMarkers(map: MapLibreMap, markers: Marker[]) {
   }
 }
 
+// Liang-Barsky obrezovanje daljice ob pravokotniku -- vrne true tudi, ko je cel segment "prebodel"
+// pravokotnik brez da bi bila katera od njegovih dveh krajišč (točk) dejansko znotraj (npr. dolg
+// segment med dvema oddaljenima GPS točkama, ki gre samo mimo/skozi majhen izbirni okvir).
+function segmentIntersectsRect(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number
+): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+
+  function clip(p: number, q: number): boolean {
+    if (p === 0) return q >= 0; // vzporedno z robom -- znotraj samo, če je že na pravi strani
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+    return true;
+  }
+
+  if (!clip(-dx, x1 - minX)) return false;
+  if (!clip(dx, maxX - x1)) return false;
+  if (!clip(-dy, y1 - minY)) return false;
+  if (!clip(dy, maxY - y1)) return false;
+  return t0 <= t1;
+}
+
 const ROUTE_SOURCE_PREFIX = "history-route";
 const ROUTE_LAYER_PREFIX = "history-route-line";
 const ROUTE_COLORS = [
@@ -244,12 +282,24 @@ export function VehicleMap({
 
       const results: { vehicleId: string; indices: number[] }[] = [];
       for (const route of historyRoutesRef.current) {
-        const indices: number[] = [];
-        route.path.forEach((coord, idx) => {
-          const p = map!.project(coord);
-          if (p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY) indices.push(idx);
+        const projected = route.path.map((coord) => map!.project(coord));
+        const selected = new Set<number>();
+
+        projected.forEach((p, idx) => {
+          if (p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY) selected.add(idx);
         });
-        if (indices.length > 0) results.push({ vehicleId: route.vehicleId, indices });
+        // Tudi segment, ki samo prečka izbirni okvir (nobena od obeh točk ni znotraj), zajame
+        // OBE svoji krajišči -- "delček črte v okvirju zajame celotno črto".
+        for (let i = 0; i < projected.length - 1; i++) {
+          const a = projected[i];
+          const b = projected[i + 1];
+          if (segmentIntersectsRect(a.x, a.y, b.x, b.y, minX, minY, maxX, maxY)) {
+            selected.add(i);
+            selected.add(i + 1);
+          }
+        }
+
+        if (selected.size > 0) results.push({ vehicleId: route.vehicleId, indices: Array.from(selected) });
       }
       if (results.length > 0) onDragSelectRef.current?.(results);
     }

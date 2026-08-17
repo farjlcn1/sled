@@ -76,6 +76,8 @@ services:
       # Most do ModemManager na gostitelju za pošiljanje SMS (glej deploy/sms-gateway/) --
       # vsebnik nima in ne potrebuje neposrednega dostopa do USB/D-Bus strojne opreme.
       - /run/sledenje-sms.sock:/run/sledenje-sms.sock
+      # Bralni dostop do traccarjevega dnevnika za zavihek "Surovi podatki" (lib/traccar-raw.ts).
+      - traccar_logs:/opt/traccar/logs:ro
 
   autoheal:
     image: willfarrell/autoheal:latest

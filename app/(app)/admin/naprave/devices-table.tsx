@@ -185,6 +185,14 @@ export function DevicesTable({
                   <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{d.note ?? ""}</td>
                   <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <a
+                        href={`/admin/naprave/${d.id}/surovi-podatki`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                      >
+                        Surovi podatki
+                      </a>
                       <button
                         type="button"
                         onClick={() => setEditingId(d.id)}

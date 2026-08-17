@@ -25,7 +25,7 @@ export type VehicleListItem = {
   registrationDate: string | null;
   nextServiceDate: string | null;
   note: string | null;
-  tenantName: string | null;
+  deviceId: string | null;
 };
 
 export type GroupItem = {
@@ -43,7 +43,6 @@ export type SelectionData = {
   driverName: string | null;
   registrationDate: string | null;
   nextServiceDate: string | null;
-  tenantName: string | null;
   note: string | null;
   status: VehicleStatus;
   rows: HistoryRow[];
@@ -319,6 +318,7 @@ export function VehiclesPanel({
                       registrationDate={v.registrationDate}
                       nextServiceDate={v.nextServiceDate}
                       note={v.note}
+                      deviceId={v.deviceId}
                       isSelected={selectedVehicleIds.includes(v.id)}
                       checked={checkedIds.has(v.id)}
                       onToggleChecked={() => toggleChecked(v.id)}
@@ -366,6 +366,7 @@ export function VehiclesPanel({
                                 registrationDate={v.registrationDate}
                                 nextServiceDate={v.nextServiceDate}
                                 note={v.note}
+                                deviceId={v.deviceId}
                                 isSelected={selectedVehicleIds.includes(v.id)}
                                 checked={checkedIds.has(v.id)}
                                 onToggleChecked={() => toggleChecked(v.id)}

@@ -70,7 +70,6 @@ export default async function ZemljevidPage({
     driverName: s.vehicle.currentDriver?.fullName ?? null,
     registrationDate: s.vehicle.registrationDate?.toISOString() ?? null,
     nextServiceDate: s.vehicle.nextServiceDate?.toISOString() ?? null,
-    tenantName: s.vehicle.tenant.name,
     note: s.vehicle.note,
     status: s.status,
     rows: s.rows,
@@ -91,7 +90,7 @@ export default async function ZemljevidPage({
         registrationDate: v.registrationDate?.toISOString() ?? null,
         nextServiceDate: v.nextServiceDate?.toISOString() ?? null,
         note: v.note,
-        tenantName: v.tenant.name,
+        deviceId: v.deviceId,
       }))}
       groups={groups.map((g) => ({
         id: g.id,

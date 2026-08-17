@@ -30,6 +30,7 @@ export function VehicleRow({
   registrationDate,
   nextServiceDate,
   note,
+  deviceId,
   isSelected,
   checked,
   onToggleChecked,
@@ -46,6 +47,7 @@ export function VehicleRow({
   registrationDate: string | null;
   nextServiceDate: string | null;
   note: string | null;
+  deviceId: string | null;
   isSelected: boolean;
   checked: boolean;
   onToggleChecked: () => void;
@@ -148,16 +150,36 @@ export function VehicleRow({
             </div>
           </div>
           {expanded && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onLoadHistory(vehicleId, plate);
-              }}
-              className="shrink-0 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white"
-            >
-              Naloži zgodovino
-            </button>
+            <div className="flex shrink-0 flex-col items-stretch gap-1.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLoadHistory(vehicleId, plate);
+                }}
+                className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white"
+              >
+                Naloži zgodovino
+              </button>
+              {deviceId ? (
+                <a
+                  href={`/admin/naprave/${deviceId}/surovi-podatki`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-center text-xs font-medium whitespace-nowrap text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Surovi podatki
+                </a>
+              ) : (
+                <span
+                  title="Vozilo nima povezane naprave."
+                  className="rounded-md border border-gray-200 px-3 py-1.5 text-center text-xs font-medium whitespace-nowrap text-gray-400 dark:border-gray-700 dark:text-gray-600"
+                >
+                  Surovi podatki
+                </span>
+              )}
+            </div>
           )}
         </div>
 

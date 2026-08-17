@@ -331,6 +331,7 @@ export function VehiclesPanel({
                       nextServiceDate={v.nextServiceDate}
                       note={v.note}
                       deviceId={v.deviceId}
+                      icon={v.icon}
                       isSelected={selectedVehicleIds.includes(v.id)}
                       checked={checkedIds.has(v.id)}
                       onToggleChecked={() => toggleChecked(v.id)}
@@ -380,6 +381,7 @@ export function VehiclesPanel({
                                 nextServiceDate={v.nextServiceDate}
                                 note={v.note}
                                 deviceId={v.deviceId}
+                                icon={v.icon}
                                 isSelected={selectedVehicleIds.includes(v.id)}
                                 checked={checkedIds.has(v.id)}
                                 onToggleChecked={() => toggleChecked(v.id)}

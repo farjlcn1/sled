@@ -2,7 +2,7 @@ import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { vehicleWhereForUser } from "@/lib/vehicle-access";
 import { VehiclesPanel, type SelectionData } from "./vehicles-panel";
-import { computeHistoryRows, type HistoryRow } from "@/lib/history-data";
+import { computeHistoryRows, attachAddresses, type HistoryRow } from "@/lib/history-data";
 import { deriveVehicleStatus, type VehicleStatus } from "@/lib/vehicle-status";
 
 // Če "do" nima izrecno nastavljene ure (privzeta polnoč ob izbiri samo dneva), ga obravnavamo
@@ -54,7 +54,7 @@ export default async function ZemljevidPage({
         if (!vehicle.device?.traccarDeviceId) {
           return { vehicle, rows: [], error: "Vozilo nima povezane naprave.", status: "unknown" };
         }
-        const rows = await computeHistoryRows(vehicle, fromDate, toDate);
+        const rows = await attachAddresses(await computeHistoryRows(vehicle, fromDate, toDate));
         const lastRow = rows[rows.length - 1];
         return { vehicle, rows, error: null, status: lastRow ? deriveVehicleStatus(lastRow) : "unknown" };
       })

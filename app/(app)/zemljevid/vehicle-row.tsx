@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { VehicleQuickStatus } from "@/app/api/vozila/[id]/status/route";
+import type { VehicleIcon } from "@/app/api/pozicije/route";
+import { ICON_SVG } from "@/lib/vehicle-icons";
 
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;
@@ -16,6 +18,26 @@ const STATUS_LABEL: Record<VehicleQuickStatus["status"], string> = {
   parked: "Čas postanka: ",
   unknown: "Čas v trenutnem stanju: ",
 };
+
+// Barva ikone vozila v seznamu: zelena (v vožnji) / oranžna (kontakt, miruje) / siva (brez
+// kontakta, miruje ali podatek še ni na voljo) -- namenoma DRUGAČNA paleta kot na zemljevidu
+// (STATUS_COLOR v vehicle-map.tsx uporablja rdečo za "parked"), ker bi rdeča čez cel dolg seznam
+// mirujočih vozil delovala preveč alarmantno za majhno ikono v vrstici.
+const STATUS_ICON_COLOR: Record<VehicleQuickStatus["status"], string> = {
+  driving: "bg-green-500",
+  idle: "bg-orange-500",
+  parked: "bg-gray-400 dark:bg-gray-500",
+  unknown: "bg-gray-400 dark:bg-gray-500",
+};
+
+function VehicleTypeIcon({ icon, status }: { icon: VehicleIcon; status: VehicleQuickStatus["status"] | null }) {
+  return (
+    <span
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${status ? STATUS_ICON_COLOR[status] : STATUS_ICON_COLOR.unknown}`}
+      dangerouslySetInnerHTML={{ __html: ICON_SVG[icon] }}
+    />
+  );
+}
 
 function fmtDate(iso: string | null) {
   return iso ? new Date(iso).toLocaleDateString("sl-SI") : "—";
@@ -60,6 +82,7 @@ export function VehicleRow({
   nextServiceDate,
   note,
   deviceId,
+  icon,
   isSelected,
   checked,
   onToggleChecked,
@@ -78,6 +101,7 @@ export function VehicleRow({
   nextServiceDate: string | null;
   note: string | null;
   deviceId: string | null;
+  icon: VehicleIcon;
   isSelected: boolean;
   checked: boolean;
   onToggleChecked: () => void;
@@ -94,8 +118,9 @@ export function VehicleRow({
   const [detail, setDetail] = useState<VehicleQuickStatus | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
 
+  // Naloži se enkrat ob izrisu vrstice (ne šele ob razširitvi) -- isti podatek zdaj barva tudi
+  // ikono vozila v strnjenem stanju, ne samo polja v razširjenem podoknu.
   useEffect(() => {
-    if (!expanded) return;
     let cancelled = false;
     fetch(`/api/vozila/${vehicleId}/status`, { cache: "no-store" })
       .then((res) => {
@@ -111,7 +136,7 @@ export function VehicleRow({
     return () => {
       cancelled = true;
     };
-  }, [expanded, vehicleId]);
+  }, [vehicleId]);
 
   function handleContextMenu(e: React.MouseEvent) {
     e.preventDefault();
@@ -161,21 +186,24 @@ export function VehicleRow({
           .join(" ")}
       >
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <span
-              className={
-                expanded
-                  ? "text-base font-bold text-blue-700 dark:text-blue-400"
-                  : "font-medium text-gray-900 dark:text-gray-100"
-              }
-            >
-              {plate}
-              {driverName && <span className="font-normal text-gray-500 dark:text-gray-400"> ({driverName})</span>}
-            </span>
-            <div
-              className={expanded ? "text-sm text-blue-600 dark:text-blue-400" : "text-xs text-gray-500 dark:text-gray-400"}
-            >
-              {brandModel}
+          <div className="flex items-start gap-2">
+            <VehicleTypeIcon icon={icon} status={detail?.status ?? null} />
+            <div>
+              <span
+                className={
+                  expanded
+                    ? "text-base font-bold text-blue-700 dark:text-blue-400"
+                    : "font-medium text-gray-900 dark:text-gray-100"
+                }
+              >
+                {plate}
+                {driverName && <span className="font-normal text-gray-500 dark:text-gray-400"> ({driverName})</span>}
+              </span>
+              <div
+                className={expanded ? "text-sm text-blue-600 dark:text-blue-400" : "text-xs text-gray-500 dark:text-gray-400"}
+              >
+                {brandModel}
+              </div>
             </div>
           </div>
           {expanded && (
@@ -251,6 +279,7 @@ export function VehicleRow({
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
+                    {detail.naslov && ` — ${detail.naslov}`}
                   </span>
                 </div>
                 <div>

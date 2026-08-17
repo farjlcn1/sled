@@ -1,22 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/session";
+import { formatLabel, type PhotonFeature } from "@/lib/photon";
 
 const PHOTON_URL = process.env.PHOTON_URL || "http://photon:2322";
-
-type PhotonFeature = {
-  properties: {
-    name?: string;
-    housenumber?: string;
-    street?: string;
-    postcode?: string;
-    city?: string;
-  };
-};
-
-function formatLabel(p: PhotonFeature["properties"]): string {
-  const streetPart = [p.street ?? p.name, p.housenumber].filter(Boolean).join(" ");
-  return [streetPart, p.postcode, p.city].filter(Boolean).join(", ");
-}
 
 // Notranji proxy do Photon geokodera (samostojen Docker servis, brez zunanjega API-ja) —
 // brskalnik ne kliče Photon-a neposredno, ker ni izpostavljen izven docker omrežja.

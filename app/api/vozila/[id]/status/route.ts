@@ -5,11 +5,13 @@ import { getTraccarRoute } from "@/lib/traccar";
 import { vehicleWhereForUser } from "@/lib/vehicle-access";
 import { deriveVehicleStatus, type VehicleStatus } from "@/lib/vehicle-status";
 import { isMoving } from "@/lib/trips";
+import { reverseGeocode } from "@/lib/photon";
 
 export type VehicleQuickStatus = {
   fixTime: string;
   latitude: number;
   longitude: number;
+  naslov: string | null;
   status: VehicleStatus;
   ignition: boolean | null;
   odometer: number | null;
@@ -51,10 +53,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     (new Date(last.fixTime).getTime() - new Date(stateStart).getTime()) / 60000
   );
 
+  const address = await reverseGeocode(last.latitude, last.longitude);
+
   const result: VehicleQuickStatus = {
     fixTime: last.fixTime,
     latitude: last.latitude,
     longitude: last.longitude,
+    naslov: address,
     status: deriveVehicleStatus(last.attributes),
     ignition: typeof last.attributes.ignition === "boolean" ? last.attributes.ignition : null,
     odometer: typeof last.attributes.odometer === "number" ? last.attributes.odometer : null,

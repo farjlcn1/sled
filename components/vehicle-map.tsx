@@ -33,6 +33,7 @@ const STATUS_TEXT: Record<VehicleStatus, string> = {
 
 export type HistoryRoute = {
   path: [number, number][];
+  vehicleId: string;
   plate: string;
   icon: VehicleIcon;
   status: VehicleStatus;
@@ -102,10 +103,14 @@ export function VehicleMap({
   visibleVehicleIds,
   historyRoutes,
   highlightPaths,
+  onDragSelect,
 }: {
   visibleVehicleIds?: Set<string>;
   historyRoutes?: HistoryRoute[];
   highlightPaths?: [number, number][][];
+  // Shift+vlečenje po zemljevidu (glej efekt spodaj) — sporoči, katere točke katerih narisanih
+  // poti so pristale znotraj izbirnega pravokotnika, da jih klicatelj lahko označi v tabeli.
+  onDragSelect?: (results: { vehicleId: string; indices: number[] }[]) => void;
 } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const outerRef = useRef<HTMLDivElement>(null);
@@ -127,6 +132,15 @@ export function VehicleMap({
   const [routeError, setRouteError] = useState<string | null>(null);
   const visibleVehicleIdsRef = useRef(visibleVehicleIds);
   const pollRef = useRef<() => void>(() => {});
+  const historyRoutesRef = useRef<HistoryRoute[]>([]);
+  const onDragSelectRef = useRef(onDragSelect);
+  const selectDragRef = useRef<{ startX: number; startY: number } | null>(null);
+  const selectBoxElRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    historyRoutesRef.current = historyRoutes ?? [];
+  }, [historyRoutes]);
+  onDragSelectRef.current = onDragSelect;
 
   useEffect(() => {
     visibleVehicleIdsRef.current = visibleVehicleIds;
@@ -160,6 +174,93 @@ export function VehicleMap({
       map.off("zoomend", handleViewChange);
       map.remove();
       mapRef.current = null;
+    };
+  }, []);
+
+  // Shift+klik-in-vlečenje po zemljevidu izriše izbirni pravokotnik; ob spustu miške vsaka
+  // narisana pot (glej historyRoutesRef), katere kakšna točka pade vanj, sporoči svoje indekse
+  // navzgor prek onDragSelect -- klicatelj jih uporabi za označitev vrstic v tabeli spodaj.
+  // Brez Shift bi trčilo z MapLibrovim lastnim vlečenjem za premikanje zemljevida, zato med
+  // izbiranjem map.dragPan izklopimo.
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    if (!map || !container) return;
+
+    function pointFromEvent(e: MouseEvent): { x: number; y: number } {
+      const rect = container!.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    function handleMouseDown(e: MouseEvent) {
+      if (!e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      map!.dragPan.disable();
+      const { x, y } = pointFromEvent(e);
+      selectDragRef.current = { startX: x, startY: y };
+
+      const box = document.createElement("div");
+      box.style.position = "absolute";
+      box.style.left = `${x}px`;
+      box.style.top = `${y}px`;
+      box.style.width = "0px";
+      box.style.height = "0px";
+      box.style.border = "2px dashed #2563eb";
+      box.style.background = "rgba(37, 99, 235, 0.15)";
+      box.style.pointerEvents = "none";
+      box.style.zIndex = "20";
+      container!.appendChild(box);
+      selectBoxElRef.current = box;
+    }
+
+    function handleMouseMove(e: MouseEvent) {
+      const drag = selectDragRef.current;
+      const box = selectBoxElRef.current;
+      if (!drag || !box) return;
+      const { x, y } = pointFromEvent(e);
+      box.style.left = `${Math.min(drag.startX, x)}px`;
+      box.style.top = `${Math.min(drag.startY, y)}px`;
+      box.style.width = `${Math.abs(x - drag.startX)}px`;
+      box.style.height = `${Math.abs(y - drag.startY)}px`;
+    }
+
+    function handleMouseUp(e: MouseEvent) {
+      const drag = selectDragRef.current;
+      const box = selectBoxElRef.current;
+      selectDragRef.current = null;
+      selectBoxElRef.current = null;
+      map!.dragPan.enable();
+      if (!drag || !box) return;
+      box.remove();
+
+      const { x, y } = pointFromEvent(e);
+      const minX = Math.min(drag.startX, x);
+      const maxX = Math.max(drag.startX, x);
+      const minY = Math.min(drag.startY, y);
+      const maxY = Math.max(drag.startY, y);
+
+      // Premik pod tem pragom je bolj podoben trepetu miške kot namernemu izbiranju.
+      if (maxX - minX < 4 && maxY - minY < 4) return;
+
+      const results: { vehicleId: string; indices: number[] }[] = [];
+      for (const route of historyRoutesRef.current) {
+        const indices: number[] = [];
+        route.path.forEach((coord, idx) => {
+          const p = map!.project(coord);
+          if (p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY) indices.push(idx);
+        });
+        if (indices.length > 0) results.push({ vehicleId: route.vehicleId, indices });
+      }
+      if (results.length > 0) onDragSelectRef.current?.(results);
+    }
+
+    container.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      container.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
     };
   }, []);
 
@@ -455,7 +556,12 @@ export function VehicleMap({
         minWidth: 320,
       }}
     >
-      <div ref={containerRef} className="h-full w-full" />
+      <div ref={containerRef} className="relative h-full w-full" />
+      {(historyRoutes ?? []).some((r) => r.path.length > 0) && (
+        <p className="absolute top-2 left-2 rounded bg-black/60 px-2 py-1 text-xs text-white">
+          Shift + vlečenje po poti za izbiro točk
+        </p>
+      )}
       {(error || routeError) && (
         <p className="absolute bottom-2 left-2 rounded bg-red-600/90 px-2 py-1 text-xs text-white">
           {error ?? routeError}

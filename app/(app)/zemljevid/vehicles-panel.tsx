@@ -256,10 +256,21 @@ export function VehiclesPanel({
     .filter((s) => !s.error && s.rows.length > 0)
     .map((s) => ({
       path: s.rows.map((r) => [r.longitude as number, r.latitude as number] as [number, number]),
+      vehicleId: s.vehicleId,
       plate: s.plate,
       icon: s.icon,
       status: s.status,
     }));
+
+  // Shift+vlečenje po narisani poti na zemljevidu (glej VehicleMap) -- zamenja izbiro tega
+  // vozila z zajetimi indeksi, enako kot bi jih izbral z vlečenjem po tabeli spodaj.
+  function handleMapDragSelect(results: { vehicleId: string; indices: number[] }[]) {
+    setPointSelection((prev) => {
+      const next = { ...prev };
+      for (const r of results) next[r.vehicleId] = new Set(r.indices);
+      return next;
+    });
+  }
 
   // Izbrane vrstice v tabeli zgodovine -> pobarvane tocke/segment na zemljevidu, vedno v kronoloskem
   // vrstnem redu (ne v trenutnem prikaznem sortiranju tabele), da je pot smiselna ne glede na sort.
@@ -472,7 +483,12 @@ export function VehiclesPanel({
           )}
         </div>
 
-        <VehicleMap visibleVehicleIds={checkedIds} historyRoutes={historyRoutes} highlightPaths={highlightPaths} />
+        <VehicleMap
+          visibleVehicleIds={checkedIds}
+          historyRoutes={historyRoutes}
+          highlightPaths={highlightPaths}
+          onDragSelect={handleMapDragSelect}
+        />
 
         {focusedVehicle && <TodaySummaryPanel vehicleId={focusedVehicle.id} plate={focusedVehicle.plate} />}
       </div>

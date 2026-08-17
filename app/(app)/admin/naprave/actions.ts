@@ -7,6 +7,7 @@ import { requirePlatformAdmin } from "@/lib/auth/session";
 import { createTraccarDevice, deleteTraccarDevice } from "@/lib/traccar";
 import { parseXlsxRows, findColumn } from "@/lib/xlsx-import";
 import { logAudit } from "@/lib/audit";
+import { sendSms } from "@/lib/sms-gateway";
 
 const deviceSchema = z.object({
   imei: z
@@ -225,9 +226,7 @@ export async function importDevicesXlsx(_prevState: ImportDevicesState, formData
   return { created, errors: errors.length > 0 ? errors : undefined };
 }
 
-// Konceptualni panj — ni pravega SMS gatewaya (glej pogovor). Edina naloga je zabeležiti namero
-// v revizijsko sled za vsako napravo posebej; klicatelj (modal) prikaže potrditveno sporočilo.
-export async function sendDeviceSms(deviceIds: string[], message: string): Promise<{ sent: number }> {
+export async function sendDeviceSms(deviceIds: string[], message: string): Promise<{ sent: number; failed: number }> {
   const user = await requirePlatformAdmin();
 
   const devices = await prisma.device.findMany({
@@ -235,7 +234,21 @@ export async function sendDeviceSms(deviceIds: string[], message: string): Promi
     select: { id: true, imei: true, simNumber: true, tenantId: true },
   });
 
+  let sent = 0;
+  let failed = 0;
+
+  // Zaporedno, ne vzporedno — modem obdela en AT ukaz naenkrat (gateway sam to tudi
+  // zavaruje z lock-om), zaporedno pošiljanje pa obenem ohrani berljiv vrstni red v reviziji.
   for (const device of devices) {
+    if (!device.simNumber) {
+      failed++;
+      continue;
+    }
+
+    const result = await sendSms(device.simNumber, message);
+    if (result.ok) sent++;
+    else failed++;
+
     await logAudit({
       userId: user.id,
       userEmail: user.email,
@@ -244,9 +257,14 @@ export async function sendDeviceSms(deviceIds: string[], message: string): Promi
       entityType: "Device",
       entityId: device.id,
       entityLabel: device.imei,
-      changes: { smsSent: { from: null, to: message.slice(0, 200) } },
+      changes: {
+        smsSent: {
+          from: null,
+          to: result.ok ? message.slice(0, 200) : `NAPAKA: ${result.error}`,
+        },
+      },
     });
   }
 
-  return { sent: devices.length };
+  return { sent, failed };
 }

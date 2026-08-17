@@ -69,8 +69,13 @@ services:
     environment:
       DATABASE_URL: postgresql://sledenje:${POSTGRES_PASSWORD}@postgres:5432/sledenje
       PHOTON_URL: http://photon:2322
+      SMS_GATEWAY_SOCKET: /run/sledenje-sms.sock
     ports:
       - "127.0.0.1:3002:3000"
+    volumes:
+      # Most do ModemManager na gostitelju za pošiljanje SMS (glej deploy/sms-gateway/) --
+      # vsebnik nima in ne potrebuje neposrednega dostopa do USB/D-Bus strojne opreme.
+      - /run/sledenje-sms.sock:/run/sledenje-sms.sock
 
   autoheal:
     image: willfarrell/autoheal:latest

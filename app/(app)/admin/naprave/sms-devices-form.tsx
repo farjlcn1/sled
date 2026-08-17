@@ -20,19 +20,19 @@ export function SmsDevicesForm({
 }: {
   devices: SmsDevice[];
   onClose: () => void;
-  onSent: (count: number) => void;
+  onSent: (result: { sent: number; failed: number }) => void;
 }) {
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function handleSend() {
-    const count = devices.length;
-    const ok = window.confirm(`Ali res želiš poslati SMS na ${count} SIM številk?`);
+    const withNumber = devices.filter((d) => d.simNumber).length;
+    const ok = window.confirm(`Ali res želiš poslati SMS na ${withNumber} SIM številk?`);
     if (!ok) return;
 
     startTransition(async () => {
       const result = await sendDeviceSms(devices.map((d) => d.id), message);
-      onSent(result.sent);
+      onSent(result);
     });
   }
 

@@ -1,0 +1,14 @@
+[Unit]
+Description=Sledenje SMS Gateway (most do ModemManager za SIM7600E)
+After=ModemManager.service
+Wants=ModemManager.service
+Before=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/sledenje-sms-gateway/gateway.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

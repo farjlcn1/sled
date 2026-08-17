@@ -215,8 +215,12 @@ export function DevicesTable({
         <SmsDevicesForm
           devices={smsDevices}
           onClose={() => setSmsOpen(false)}
-          onSent={(count) => {
-            setSmsMessage(`SMS zapisan za ${count} naprav${count === 1 ? "o" : "e"}.`);
+          onSent={({ sent, failed }) => {
+            setSmsMessage(
+              failed === 0
+                ? `SMS uspešno poslan na ${sent} naprav${sent === 1 ? "o" : "e"}.`
+                : `SMS poslan na ${sent} naprav${sent === 1 ? "o" : "e"}, ${failed} neuspešn${failed === 1 ? "a" : "ih"}.`
+            );
             setChecked(new Set());
             setSmsOpen(false);
           }}

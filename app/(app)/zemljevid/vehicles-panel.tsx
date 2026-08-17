@@ -291,7 +291,9 @@ export function VehiclesPanel({
 
   return (
     <div className="space-y-6 pb-24">
-      <div className={`grid grid-cols-1 gap-4 ${focusedVehicle ? "lg:grid-cols-[360px_1fr_300px]" : "lg:grid-cols-[360px_1fr]"}`}>
+      <div
+        className={`grid grid-cols-1 gap-4 ${focusedVehicle ? "lg:grid-cols-[360px_minmax(0,1fr)_300px]" : "lg:grid-cols-[360px_minmax(0,1fr)]"}`}
+      >
         <div
           className="relative self-start overflow-x-auto overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700"
           style={{ maxHeight: SIDEBAR_MAX_HEIGHT }}

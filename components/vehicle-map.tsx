@@ -153,8 +153,8 @@ export function VehicleMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const outerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const [height, setHeight] = useState<number | null>(null);
-  const [width, setWidth] = useState<number | null>(null);
+  const [height, setHeight] = useState<number | null>(746);
+  const [width, setWidth] = useState<number | null>(1702);
   const resizeDragRef = useRef<{
     startX: number;
     startY: number;
@@ -604,6 +604,7 @@ export function VehicleMap({
         ...(width !== null ? { width } : undefined),
         minHeight: 320,
         minWidth: 320,
+        maxWidth: "100%",
       }}
     >
       <div ref={containerRef} className="relative h-full w-full" />

@@ -8,16 +8,34 @@ const LOG_PATH = `${LOG_DIR}/tracker-server.log`;
 // zato branje celotne datoteke ob vsakem kliku ne bi bilo smiselno.
 const TAIL_BYTES = 4 * 1024 * 1024;
 
-function todayStr(): string {
-  const d = new Date();
+function dateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function todayStr(): string {
+  return dateStr(new Date());
+}
+
+// Vsak koledarski dan med from in to (oba vključno), kot "YYYY-MM-DD" -- za branje
+// dnevnika po dnevih rotiranih datotek za izbrano obdobje.
+function daysInRange(from: string, to: string): string[] {
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  const cur = new Date(fy, fm - 1, fd);
+  const end = new Date(ty, tm - 1, td);
+  const days: string[] = [];
+  while (cur <= end) {
+    days.push(dateStr(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return days;
 }
 
 // Traccar dnevnik dnevno rotira (npr. tracker-server.log.20260810) -- za današnji dan
 // je to kar trenutna, še rastoča datoteka, za pretekle dni pa poiščemo ustrezno rotirano.
 // Vrne null, če za zahtevani dan ni (več) nobenega dnevnika.
-async function resolveLogPath(date: string | undefined): Promise<string | null> {
-  if (!date || date === todayStr()) return LOG_PATH;
+async function resolveLogPath(date: string): Promise<string | null> {
+  if (date === todayStr()) return LOG_PATH;
 
   const compact = date.replaceAll("-", "");
   const files = await readdir(LOG_DIR);
@@ -84,12 +102,18 @@ type ParsedLine = RawLogLine & {
 
 export async function getRawDataForImei(
   imei: string,
-  date?: string
+  from?: string,
+  to?: string
 ): Promise<{ lines: RawLogLine[]; scannedBytes: number }> {
-  const logPath = await resolveLogPath(date);
-  if (!logPath) return { lines: [], scannedBytes: 0 };
+  const fromDate = from ?? todayStr();
+  const toDate = to ?? fromDate;
 
-  const text = await readLogTail(logPath);
+  const logPaths = (await Promise.all(daysInRange(fromDate, toDate).map(resolveLogPath))).filter(
+    (p): p is string => p !== null
+  );
+  if (logPaths.length === 0) return { lines: [], scannedBytes: 0 };
+
+  const text = (await Promise.all(logPaths.map(readLogTail))).join("\n");
   const rawLines = text.split("\n");
 
   const parsed: ParsedLine[] = [];

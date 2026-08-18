@@ -50,12 +50,13 @@ export default async function SuroviPodatkiPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ datum?: string }>;
+  searchParams: Promise<{ from?: string; to?: string }>;
 }) {
   const user = await requireUser();
   const { id } = await params;
-  const { datum } = await searchParams;
-  const selectedDate = datum ?? todayStr();
+  const { from, to } = await searchParams;
+  const selectedFrom = from ?? todayStr();
+  const selectedTo = to ?? selectedFrom;
 
   const device = await prisma.device.findUnique({
     where: { id },
@@ -68,7 +69,7 @@ export default async function SuroviPodatkiPage({
   let scannedBytes = 0;
   let error: string | null = null;
   try {
-    const result = await getRawDataForImei(device.imei, selectedDate);
+    const result = await getRawDataForImei(device.imei, selectedFrom, selectedTo);
     lines = result.lines;
     scannedBytes = result.scannedBytes;
   } catch {
@@ -87,19 +88,23 @@ export default async function SuroviPodatkiPage({
       </h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         Dobesedni bajti (hex), ki jih je naprava izmenjala s Traccar strežnikom — pregledanih zadnjih{" "}
-        {fmtBytes(scannedBytes)} dnevnika za izbrani dan.
+        {fmtBytes(scannedBytes)} dnevnika za izbrano obdobje.
       </p>
 
       <form className="mt-3 flex flex-wrap items-end gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Dan</label>
-          <SlovenianDateInput name="datum" defaultValue={selectedDate} className="mt-1 w-40" />
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Od</label>
+          <SlovenianDateInput name="from" defaultValue={selectedFrom} className="mt-1 w-40" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Do</label>
+          <SlovenianDateInput name="to" defaultValue={selectedTo} className="mt-1 w-40" />
         </div>
         <button type="submit" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white">
           Prikaži
         </button>
         <a
-          href={`/admin/naprave/${id}/surovi-podatki?datum=${selectedDate}`}
+          href={`/admin/naprave/${id}/surovi-podatki?from=${selectedFrom}&to=${selectedTo}`}
           className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 dark:border-gray-600 dark:text-gray-300"
         >
           Osveži
@@ -110,8 +115,8 @@ export default async function SuroviPodatkiPage({
 
       {!error && sessions.length === 0 && (
         <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-          Za izbrani dan ni podatkov za to napravo — naprava se morda ni povezala s strežnikom, ali pa za ta dan ni
-          (več) ohranjenega dnevnika.
+          Za izbrano obdobje ni podatkov za to napravo — naprava se morda ni povezala s strežnikom, ali pa za te dneve
+          ni (več) ohranjenega dnevnika.
         </p>
       )}
 

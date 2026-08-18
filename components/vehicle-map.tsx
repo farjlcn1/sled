@@ -528,6 +528,10 @@ export function VehicleMap({
     async function poll() {
       try {
         const res = await fetch("/api/pozicije", { cache: "no-store" });
+        // Ob potekli seji nas proxy.ts preusmeri na /login -- fetch to preusmeritev tiho
+        // sledi in vrne HTML strani za prijavo namesto JSON-a, kar bi spodaj povzročilo
+        // nerazumljivo napako pri razčlenjevanju.
+        if (res.redirected) throw new Error("Seja je potekla. Osveži stran za ponovno prijavo.");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const { positions } = (await res.json()) as { positions: VehiclePosition[] };
         if (cancelled || !mapRef.current) return;

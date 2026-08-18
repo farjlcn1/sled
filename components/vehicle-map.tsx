@@ -6,6 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { VehicleIcon, VehiclePosition } from "@/app/api/pozicije/route";
 import type { VehicleStatus } from "@/lib/vehicle-status";
 import { ICON_SVG } from "@/lib/vehicle-icons";
+import { fetchJson } from "@/lib/fetch-json";
 
 // Turbopack corrupts maplibre-gl's self-bootstrapped worker (glej next.config.ts) — uporabimo
 // ločeno CSP datoteko namesto tega. Mora biti klicano pred prvim new MapLibreMap(...).
@@ -527,13 +528,7 @@ export function VehicleMap({
 
     async function poll() {
       try {
-        const res = await fetch("/api/pozicije", { cache: "no-store" });
-        // Ob potekli seji nas proxy.ts preusmeri na /login -- fetch to preusmeritev tiho
-        // sledi in vrne HTML strani za prijavo namesto JSON-a, kar bi spodaj povzročilo
-        // nerazumljivo napako pri razčlenjevanju.
-        if (res.redirected) throw new Error("Seja je potekla. Osveži stran za ponovno prijavo.");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const { positions } = (await res.json()) as { positions: VehiclePosition[] };
+        const { positions } = await fetchJson<{ positions: VehiclePosition[] }>("/api/pozicije", { cache: "no-store" });
         if (cancelled || !mapRef.current) return;
         setError(null);
         const allowed = visibleVehicleIdsRef.current;

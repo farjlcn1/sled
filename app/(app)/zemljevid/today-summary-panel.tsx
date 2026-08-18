@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { TodaySummary } from "@/app/api/vozila/[id]/danes/route";
+import { fetchJson, SessionExpiredError } from "@/lib/fetch-json";
 
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${Math.round(minutes)} min`;
@@ -27,16 +28,13 @@ export function TodaySummaryPanel({ vehicleId, plate }: { vehicleId: string; pla
     let cancelled = false;
     setData(null);
     setError(null);
-    fetch(`/api/vozila/${vehicleId}/danes`, { cache: "no-store" })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<TodaySummary>;
-      })
+    fetchJson<TodaySummary>(`/api/vozila/${vehicleId}/danes`, { cache: "no-store" })
       .then((result) => {
         if (!cancelled) setData(result);
       })
-      .catch(() => {
-        if (!cancelled) setError("Podatkov trenutno ni mogoče prikazati.");
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof SessionExpiredError ? err.message : "Podatkov trenutno ni mogoče prikazati.");
       });
     return () => {
       cancelled = true;

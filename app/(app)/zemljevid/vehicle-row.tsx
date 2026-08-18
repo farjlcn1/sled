@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { VehicleQuickStatus } from "@/app/api/vozila/[id]/status/route";
 import type { VehicleIcon } from "@/app/api/pozicije/route";
 import { ICON_SVG } from "@/lib/vehicle-icons";
+import { fetchJson, SessionExpiredError } from "@/lib/fetch-json";
 
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;
@@ -122,16 +123,13 @@ export function VehicleRow({
   // ikono vozila v strnjenem stanju, ne samo polja v razširjenem podoknu.
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/vozila/${vehicleId}/status`, { cache: "no-store" })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<VehicleQuickStatus>;
-      })
+    fetchJson<VehicleQuickStatus>(`/api/vozila/${vehicleId}/status`, { cache: "no-store" })
       .then((data) => {
         if (!cancelled) setDetail(data);
       })
-      .catch(() => {
-        if (!cancelled) setDetailError("Podatkov trenutno ni mogoče prikazati.");
+      .catch((err) => {
+        if (cancelled) return;
+        setDetailError(err instanceof SessionExpiredError ? err.message : "Podatkov trenutno ni mogoče prikazati.");
       });
     return () => {
       cancelled = true;

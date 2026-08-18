@@ -1,10 +1,29 @@
 import "server-only";
-import { open, stat } from "node:fs/promises";
+import { open, readdir, stat } from "node:fs/promises";
+import path from "node:path";
 
-const LOG_PATH = "/opt/traccar/logs/tracker-server.log";
+const LOG_DIR = "/opt/traccar/logs";
+const LOG_PATH = `${LOG_DIR}/tracker-server.log`;
 // Prebere samo rep dnevnika -- dnevnik ob prometnem voznem parku raste neomejeno,
 // zato branje celotne datoteke ob vsakem kliku ne bi bilo smiselno.
 const TAIL_BYTES = 4 * 1024 * 1024;
+
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Traccar dnevnik dnevno rotira (npr. tracker-server.log.20260810) -- za današnji dan
+// je to kar trenutna, še rastoča datoteka, za pretekle dni pa poiščemo ustrezno rotirano.
+// Vrne null, če za zahtevani dan ni (več) nobenega dnevnika.
+async function resolveLogPath(date: string | undefined): Promise<string | null> {
+  if (!date || date === todayStr()) return LOG_PATH;
+
+  const compact = date.replaceAll("-", "");
+  const files = await readdir(LOG_DIR);
+  const match = files.find((f) => f.includes(compact));
+  return match ? path.join(LOG_DIR, match) : null;
+}
 
 export type RawLogLine = {
   timestamp: string;
@@ -16,6 +35,11 @@ export type RawLogLine = {
 };
 
 const HEX_LINE = /^(\S+ \S+)\s+INFO:\s+\[(\w+):\s*(\S+)\s+([<>])\s+([\d.]+)\]\s+([0-9a-fA-F]+)\s*$/;
+// OsmAnd protokol (npr. testni/demo vozni park, ki pozicije pošilja prek preprostih HTTP GET
+// zahtev namesto binarnega Teltonika zapisa) -- v dnevniku ni hex plačila, ampak berljiv URL,
+// ki že sam vsebuje IMEI (?id=...), zato tu sploh ne rabimo dekodiranja "rokovanja" kot spodaj.
+const OSMAND_LINE = /^(\S+ \S+)\s+INFO:\s+\[(\w+):\s*(\S+)\s+([<>])\s+([\d.]+)\]\s+(GET .+)$/;
+const OSMAND_ID = /[?&]id=(\d+)/;
 const BRACKET_LINE = /^(\S+ \S+)\s+INFO:\s+\[(\w+)\]\s+(.*)$/;
 const ID_LINE = /^id:\s*(\d+),/;
 
@@ -34,11 +58,11 @@ function decodeHandshakeImei(hex: string): string | null {
   return /^\d{10,17}$/.test(ascii) ? ascii : null;
 }
 
-async function readLogTail(): Promise<string> {
-  const stats = await stat(LOG_PATH);
+async function readLogTail(logPath: string): Promise<string> {
+  const stats = await stat(logPath);
   const start = Math.max(0, stats.size - TAIL_BYTES);
   const length = stats.size - start;
-  const handle = await open(LOG_PATH, "r");
+  const handle = await open(logPath, "r");
   try {
     const buffer = Buffer.alloc(length);
     await handle.read(buffer, 0, length, start);
@@ -50,11 +74,25 @@ async function readLogTail(): Promise<string> {
   }
 }
 
-export async function getRawDataForImei(imei: string): Promise<{ lines: RawLogLine[]; scannedBytes: number }> {
-  const text = await readLogTail();
+type ParsedLine = RawLogLine & {
+  // OsmAnd je brezstanjski HTTP -- Traccar isto "sejo" (npr. eno keep-alive povezavo) v praksi
+  // deli med VEČ napravami hkrati, zato seja->IMEI ni 1:1 kot pri Teltonikinem lastnem TCP-ju.
+  // Vsaka OsmAnd vrstica pa IMEI že nosi sama (?id=...), zato jo filtriramo neposredno po tem,
+  // mimo (nezanesljive) preslikave prek seje.
+  directImei?: string;
+};
+
+export async function getRawDataForImei(
+  imei: string,
+  date?: string
+): Promise<{ lines: RawLogLine[]; scannedBytes: number }> {
+  const logPath = await resolveLogPath(date);
+  if (!logPath) return { lines: [], scannedBytes: 0 };
+
+  const text = await readLogTail(logPath);
   const rawLines = text.split("\n");
 
-  const parsed: RawLogLine[] = [];
+  const parsed: ParsedLine[] = [];
   const sessionToImei = new Map<string, string>();
 
   for (const line of rawLines) {
@@ -62,6 +100,13 @@ export async function getRawDataForImei(imei: string): Promise<{ lines: RawLogLi
     if (hexMatch) {
       const [, timestamp, sessionId, protocol, dir, remoteAddress, hex] = hexMatch;
       parsed.push({ timestamp, sessionId, kind: dir === "<" ? "in" : "out", protocol, remoteAddress, hex });
+      continue;
+    }
+    const osmandMatch = line.match(OSMAND_LINE);
+    if (osmandMatch) {
+      const [, timestamp, sessionId, protocol, dir, remoteAddress, payload] = osmandMatch;
+      const directImei = payload.match(OSMAND_ID)?.[1];
+      parsed.push({ timestamp, sessionId, kind: dir === "<" ? "in" : "out", protocol, remoteAddress, hex: payload, directImei });
       continue;
     }
     const bracketMatch = line.match(BRACKET_LINE);
@@ -77,13 +122,13 @@ export async function getRawDataForImei(imei: string): Promise<{ lines: RawLogLi
   }
 
   for (const line of parsed) {
-    if (line.kind === "in" && line.hex && !sessionToImei.has(line.sessionId)) {
+    if (line.kind === "in" && line.hex && !line.directImei && !sessionToImei.has(line.sessionId)) {
       const decoded = decodeHandshakeImei(line.hex);
       if (decoded) sessionToImei.set(line.sessionId, decoded);
     }
   }
 
-  const lines = parsed.filter((l) => sessionToImei.get(l.sessionId) === imei);
+  const lines: RawLogLine[] = parsed.filter((l) => (l.directImei ?? sessionToImei.get(l.sessionId)) === imei);
 
   return { lines, scannedBytes: Buffer.byteLength(text, "utf-8") };
 }

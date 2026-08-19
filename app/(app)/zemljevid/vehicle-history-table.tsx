@@ -57,12 +57,14 @@ function computeDistanceKm(points: HistoryRow[]): number {
 }
 
 export function VehicleHistoryTable({
+  plate,
   rows,
   initialVisibleFields,
   exportHref,
   selectedIndices,
   onSelectedIndicesChange,
 }: {
+  plate: string;
   rows: HistoryRow[];
   initialVisibleFields: string[];
   exportHref: string;
@@ -327,6 +329,8 @@ export function VehicleHistoryTable({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <span className="font-semibold text-gray-900 dark:text-gray-100">{plate}</span>
+          <span className="mx-2 text-gray-300 dark:text-gray-600">|</span>
           Zgodovina pozicij ({rows.length})
           <span className="ml-2 font-normal text-gray-500 dark:text-gray-400">
             — {totalDistanceKm.toFixed(1)} km

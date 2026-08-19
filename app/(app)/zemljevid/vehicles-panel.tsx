@@ -497,13 +497,15 @@ export function VehiclesPanel({
 
       {selections.map((s) => (
         <div key={s.vehicleId} className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{s.plate}</p>
-
           {s.error ? (
-            <p className="text-sm text-red-600 dark:text-red-400">{s.error}</p>
+            <>
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{s.plate}</p>
+              <p className="text-sm text-red-600 dark:text-red-400">{s.error}</p>
+            </>
           ) : (
             <VehicleHistoryTable
               key={`${s.vehicleId}-${s.from}-${s.to}`}
+              plate={s.plate}
               rows={s.rows}
               initialVisibleFields={initialVisibleFields}
               exportHref={`/api/zemljevid/izvoz?vozilo=${s.vehicleId}&from=${s.from}&to=${s.to}`}

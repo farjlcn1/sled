@@ -164,7 +164,9 @@ export function VehicleMap({
     axis: "x" | "y" | "both";
   } | null>(null);
   const markersRef = useRef<Map<string, Marker>>(new Map());
-  const historyMarkersRef = useRef<Marker[]>([]);
+  // Ključ po vehicleId (ne seznam) -- da lahko ob živi poziciji istega vozila spodaj njegov
+  // konec-poti oznaka odstranimo namesto podvojene registrske na zemljevidu.
+  const historyMarkersRef = useRef<Map<string, Marker>>(new Map());
   const prevRouteCountRef = useRef(0);
   const prevHighlightCountRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
@@ -203,7 +205,7 @@ export function VehicleMap({
 
     // Ob vsakem premiku/zoomu se lahko spremenijo zasedena mesta na zaslonu — ponovno razmakni napise.
     function handleViewChange() {
-      declutterMarkers(map, [...markersRef.current.values(), ...historyMarkersRef.current]);
+      declutterMarkers(map, [...markersRef.current.values(), ...historyMarkersRef.current.values()]);
     }
     map.on("moveend", handleViewChange);
     map.on("zoomend", handleViewChange);
@@ -395,7 +397,7 @@ export function VehicleMap({
         if (map.getSource(sourceId)) map.removeSource(sourceId);
       }
       historyMarkersRef.current.forEach((m) => m.remove());
-      historyMarkersRef.current = [];
+      historyMarkersRef.current.clear();
 
       const routes = (historyRoutes ?? []).filter((r) => r.path.length > 0);
       prevRouteCountRef.current = routes.length;
@@ -425,20 +427,24 @@ export function VehicleMap({
           });
         }
 
-        const lastPoint = route.path[route.path.length - 1];
-        const marker = new Marker({
-          element: createMarkerElement(route.icon, route.plate, STATUS_COLOR[route.status]),
-        })
-          .setLngLat(lastPoint)
-          .addTo(map);
-        historyMarkersRef.current.push(marker);
+        // Če je vozilo tudi odkljukano (živa pozicija že prikazuje registrsko na zemljevidu),
+        // tu ne dodajamo še ene oznake -- sicer je registrska napisana dvakrat.
+        if (!markersRef.current.has(route.vehicleId)) {
+          const lastPoint = route.path[route.path.length - 1];
+          const marker = new Marker({
+            element: createMarkerElement(route.icon, route.plate, STATUS_COLOR[route.status]),
+          })
+            .setLngLat(lastPoint)
+            .addTo(map);
+          historyMarkersRef.current.set(route.vehicleId, marker);
+        }
 
         for (const coord of route.path) {
           bounds = bounds ? bounds.extend(coord) : new LngLatBounds(coord, coord);
         }
       });
 
-      declutterMarkers(map, [...markersRef.current.values(), ...historyMarkersRef.current]);
+      declutterMarkers(map, [...markersRef.current.values(), ...historyMarkersRef.current.values()]);
 
       // maxZoom omeji, kako blizu se približa za majhen/mirujoč niz točk (npr. eno samo parkirano
       // vozilo) -- 14 je bilo pretesno (skoraj ulična raven), 12 pusti več okoliškega konteksta.
@@ -554,6 +560,14 @@ export function VehicleMap({
             .setPopup(new Popup({ offset: 14 }))
             .addTo(map);
           markersRef.current.set(pos.vehicleId, marker);
+
+          // Če je bila za to vozilo že prikazana oznaka konca poti (naložena zgodovina), jo
+          // odstranimo -- odslej ima prednost živa pozicija, da registrska ni napisana dvakrat.
+          const historyMarker = historyMarkersRef.current.get(pos.vehicleId);
+          if (historyMarker) {
+            historyMarker.remove();
+            historyMarkersRef.current.delete(pos.vehicleId);
+          }
         }
         marker.setLngLat([pos.longitude, pos.latitude]);
         const badge = marker.getElement().querySelector<HTMLElement>(".vehicle-marker-badge");
@@ -581,7 +595,7 @@ export function VehicleMap({
         }
       }
 
-      declutterMarkers(map, [...markersRef.current.values(), ...historyMarkersRef.current]);
+      declutterMarkers(map, [...markersRef.current.values(), ...historyMarkersRef.current.values()]);
     }
 
     poll();

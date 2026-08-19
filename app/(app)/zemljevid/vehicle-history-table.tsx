@@ -74,6 +74,36 @@ export function VehicleHistoryTable({
   const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
+  // Ročica za spremembo višine spodaj -- 512px (prejšnji fiksni max-h-[32rem]) ostane privzeta
+  // višina, uporabnik pa jo lahko po potrebi poveča/zmanjša, enako kot pri zemljevidu.
+  const [tableHeight, setTableHeight] = useState(512);
+  const heightDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+
+  useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      const drag = heightDragRef.current;
+      if (!drag) return;
+      setTableHeight(Math.max(200, drag.startHeight + (e.clientY - drag.startY)));
+    }
+    function handleMouseUp() {
+      heightDragRef.current = null;
+    }
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  function handleHeightHandleMouseDown(e: React.MouseEvent) {
+    e.preventDefault();
+    heightDragRef.current = {
+      startY: e.clientY,
+      startHeight: scrollContainerRef.current?.getBoundingClientRect().height ?? tableHeight,
+    };
+  }
+
   useEffect(() => {
     if (!pickerOpen) return;
     function handleClickOutside(e: MouseEvent) {
@@ -348,7 +378,8 @@ export function VehicleHistoryTable({
           onMouseLeave={() => {
             isHoveredRef.current = false;
           }}
-          className="max-h-[32rem] overflow-auto rounded-md border border-gray-200 dark:border-gray-700"
+          style={{ height: tableHeight }}
+          className="relative overflow-auto rounded-md border border-gray-200 dark:border-gray-700"
         >
           <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
             <thead className="sticky top-0 bg-gray-50 dark:bg-gray-800">
@@ -405,6 +436,14 @@ export function VehicleHistoryTable({
               })}
             </tbody>
           </table>
+
+          <div
+            onMouseDown={handleHeightHandleMouseDown}
+            title="Povleci za spremembo višine"
+            className="absolute inset-x-0 bottom-0 z-20 flex h-3 cursor-ns-resize items-center justify-center hover:bg-black/10 dark:hover:bg-white/10"
+          >
+            <div className="h-1 w-10 rounded-full bg-gray-400/80 dark:bg-gray-300/70" />
+          </div>
         </div>
       )}
     </div>

@@ -85,13 +85,17 @@ export function VehicleHistoryTable({
   // 512px je bil prej fiksen -- ker je nad to tabelo vozni sklop (zemljevid, "Danes" ipd.)
   // spremenljive višine, samo fiksno privzeto število ne zagotovi, da je tabela v celoti
   // vidna brez scrollanja strani. Namesto tega ob prvem izrisu izmerimo, koliko prostora
-  // dejansko preostane od vrha te tabele do dna okna, in privzeto višino nastavimo na to.
+  // dejansko preostane od vrha te tabele do dna okna, in privzeto višino nastavimo na to --
+  // navzgor pa omejeno na višino zemljevida, da pri več hkrati odkljukanih vozilih (torej več
+  // tabel druga pod drugo) vsaka posebej ne poskuša spet segati do dna zaslona in jih skupaj
+  // ne "razpotegne" veliko nižje, kot sega zemljevid.
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const available = window.innerHeight - rect.top - 24;
-    setTableHeight(Math.max(200, Math.round(available)));
+    const mapHeight = document.querySelector(".maplibregl-map")?.getBoundingClientRect().height ?? Infinity;
+    setTableHeight(Math.max(200, Math.round(Math.min(available, mapHeight))));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- samo ob prvem izrisu te (nove) komponente
   }, []);
 

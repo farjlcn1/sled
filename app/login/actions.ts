@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 import { logAudit } from "@/lib/audit";
+import { checkLoginRateLimit, recordLoginFailure, recordLoginSuccess } from "@/lib/auth/rate-limit";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -25,14 +26,27 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
 
   const rememberMe = formData.get("rememberMe") === "on";
   const redirectTo = formData.get("redirectTo");
+  const email = parsed.data.email.toLowerCase();
+
+  const rateLimit = checkLoginRateLimit(email);
+  if (rateLimit.blocked) {
+    await logAudit({
+      userEmail: email,
+      action: "LOGIN_FAILED",
+      entityType: "Session",
+      entityLabel: "Zaklenjeno zaradi prevečkrat neuspelih poskusov",
+    });
+    return { error: rateLimit.message };
+  }
 
   const user = await prisma.user.findUnique({
-    where: { email: parsed.data.email.toLowerCase() },
+    where: { email },
   });
 
   if (!user || !user.isActive) {
+    recordLoginFailure(email);
     await logAudit({
-      userEmail: parsed.data.email.toLowerCase(),
+      userEmail: email,
       action: "LOGIN_FAILED",
       entityType: "Session",
       entityLabel: "Napačen email ali neaktiven uporabnik",
@@ -42,6 +56,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
 
   const valid = await verifyPassword(parsed.data.password, user.passwordHash);
   if (!valid) {
+    recordLoginFailure(email);
     await logAudit({
       userId: user.id,
       userEmail: user.email,
@@ -53,6 +68,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     return { error: "Napačen email ali geslo." };
   }
 
+  recordLoginSuccess(email);
   await createSession(user.id, rememberMe);
   await logAudit({
     userId: user.id,

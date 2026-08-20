@@ -76,10 +76,24 @@ export function VehicleHistoryTable({
   const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
-  // Ročica za spremembo višine spodaj -- 512px (prejšnji fiksni max-h-[32rem]) ostane privzeta
-  // višina, uporabnik pa jo lahko po potrebi poveča/zmanjša, enako kot pri zemljevidu.
+  // Ročica za spremembo višine spodaj -- privzeto se tabela ob prvem izrisu sama razširi
+  // do dna zaslona (glej efekt spodaj), uporabnik pa jo lahko po potrebi poveča/zmanjša,
+  // enako kot pri zemljevidu.
   const [tableHeight, setTableHeight] = useState(512);
   const heightDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+
+  // 512px je bil prej fiksen -- ker je nad to tabelo vozni sklop (zemljevid, "Danes" ipd.)
+  // spremenljive višine, samo fiksno privzeto število ne zagotovi, da je tabela v celoti
+  // vidna brez scrollanja strani. Namesto tega ob prvem izrisu izmerimo, koliko prostora
+  // dejansko preostane od vrha te tabele do dna okna, in privzeto višino nastavimo na to.
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const available = window.innerHeight - rect.top - 24;
+    setTableHeight(Math.max(200, Math.round(available)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- samo ob prvem izrisu te (nove) komponente
+  }, []);
 
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {

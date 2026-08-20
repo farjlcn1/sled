@@ -1,6 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ACTION_LABELS, ENTITY_LABELS } from "@/lib/audit-labels";
+
+export { ACTION_LABELS, ENTITY_LABELS };
 
 export type AuditLogRow = {
   id: string;
@@ -10,27 +13,6 @@ export type AuditLogRow = {
   entityType: string;
   entityLabel: string | null;
   changesSummary: string | null;
-};
-
-export const ACTION_LABELS: Record<string, string> = {
-  LOGIN: "Prijava",
-  LOGIN_FAILED: "Neuspela prijava",
-  LOGOUT: "Odjava",
-  CREATE: "Ustvarjeno",
-  UPDATE: "Spremenjeno",
-  DELETE: "Izbrisano",
-};
-
-export const ENTITY_LABELS: Record<string, string> = {
-  Vehicle: "Vozilo",
-  Driver: "Voznik",
-  VehicleGroup: "Skupina vozil",
-  User: "Uporabnik",
-  Device: "Naprava",
-  Tenant: "Podjetje",
-  PotniNalog: "Potni nalog",
-  TachoFile: "Tahografska datoteka",
-  Session: "Seja (prijava/odjava)",
 };
 
 type SortDir = "asc" | "desc";

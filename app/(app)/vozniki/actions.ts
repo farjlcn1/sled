@@ -180,8 +180,33 @@ export async function assignDriverToVehicle(driverId: string, vehicleId: string)
     const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
     if (!vehicle || vehicle.tenantId !== user.tenantId) throw new Error("Vozilo ni na voljo.");
     await prisma.vehicle.update({ where: { id: vehicleId }, data: { currentDriverId: driverId } });
+    // Beleženo, da je stran vozila lahko prikaže zgodovino vseh kadarkoli dodeljenih voznikov --
+    // brez tega assignDriverToVehicle ni bil nikoli zabeležen v revizijsko sled.
+    await logAudit({
+      userId: user.id,
+      userEmail: user.email,
+      tenantId: user.tenantId,
+      action: "UPDATE",
+      entityType: "Vehicle",
+      entityId: vehicleId,
+      entityLabel: vehicle.plate,
+      changes: diffFields(vehicle, { currentDriverId: driverId }),
+    });
   } else {
+    const vehicles = await prisma.vehicle.findMany({ where: { currentDriverId: driverId, tenantId: user.tenantId } });
     await prisma.vehicle.updateMany({ where: { currentDriverId: driverId, tenantId: user.tenantId }, data: { currentDriverId: null } });
+    for (const v of vehicles) {
+      await logAudit({
+        userId: user.id,
+        userEmail: user.email,
+        tenantId: user.tenantId,
+        action: "UPDATE",
+        entityType: "Vehicle",
+        entityId: v.id,
+        entityLabel: v.plate,
+        changes: diffFields(v, { currentDriverId: null }),
+      });
+    }
   }
   revalidatePath("/vozniki");
   revalidatePath("/vozila");

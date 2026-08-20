@@ -234,6 +234,15 @@ export function VehicleRow({
                   Surovi podatki
                 </span>
               )}
+              <a
+                href={`/vozila/${vehicleId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-center text-xs font-medium whitespace-nowrap text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                Vozilo
+              </a>
             </div>
           )}
         </div>

@@ -195,6 +195,7 @@ export async function updateVehicle(
   });
 
   revalidatePath("/vozila");
+  revalidatePath(`/vozila/${vehicleId}`);
   revalidatePath("/zemljevid");
   return { success: true };
 }

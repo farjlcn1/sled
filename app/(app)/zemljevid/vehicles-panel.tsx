@@ -444,6 +444,19 @@ export function VehiclesPanel({
               >
                 {menuLabel}
               </button>
+              {contextMenu.target.type === "vehicle" && (
+                <button
+                  type="button"
+                  className="block w-full whitespace-nowrap px-3 py-1.5 text-left text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
+                  onClick={() => {
+                    if (contextMenu.target.type !== "vehicle") return;
+                    window.open(`/vozila/${contextMenu.target.vehicleId}`, "_blank", "noopener,noreferrer");
+                    setContextMenu(null);
+                  }}
+                >
+                  Vozilo
+                </button>
+              )}
             </div>
           )}
 

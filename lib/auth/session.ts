@@ -27,6 +27,7 @@ export type CurrentUser = {
   canManageDrivers: boolean;
   canViewReports: boolean;
   visibleVehicleFields: string[];
+  visibleTabs: string[];
 };
 
 export async function createSession(userId: string, rememberMe: boolean) {
@@ -85,6 +86,7 @@ export async function getSession(): Promise<CurrentUser | null> {
     canManageDrivers: user.canManageDrivers,
     canViewReports: user.canViewReports,
     visibleVehicleFields: user.visibleVehicleFields,
+    visibleTabs: user.visibleTabs,
   };
 }
 
@@ -95,7 +97,7 @@ export async function requireUser(): Promise<CurrentUser> {
 }
 
 export async function requirePermission(
-  permission: keyof Omit<CurrentUser, "id" | "email" | "fullName" | "tenantId" | "level" | "visibleVehicleFields">
+  permission: keyof Omit<CurrentUser, "id" | "email" | "fullName" | "tenantId" | "level" | "visibleVehicleFields" | "visibleTabs">
 ): Promise<CurrentUser> {
   const user = await requireUser();
   if (!user[permission]) redirect("/");

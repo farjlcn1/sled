@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/auth/session";
 import { diffFields, logAudit } from "@/lib/audit";
 import { generateStrongPassword, hashPassword, passwordSchema } from "@/lib/auth/password";
 import { isMailConfigured, sendMail } from "@/lib/mail";
-import { LEVEL_PERMISSIONS } from "@/lib/permissions";
+import { LEVEL_PERMISSIONS, NAV_TABS } from "@/lib/permissions";
 
 const userSchema = z.object({
   email: z.string().trim().email("Vnesi veljaven email."),
@@ -132,6 +132,7 @@ const editUserSchema = z.object({
   newPassword: z.string().optional(),
   vehicleIds: z.array(z.string()).default([]),
   groupIds: z.array(z.string()).default([]),
+  visibleTabs: z.array(z.string()).default([]),
 });
 
 export type EditUserState = { error?: string; success?: boolean } | undefined;
@@ -150,10 +151,16 @@ export async function updateUser(_prevState: EditUserState, formData: FormData):
     newPassword: formData.get("newPassword") || undefined,
     vehicleIds: formData.getAll("vehicleIds").map(String),
     groupIds: formData.getAll("groupIds").map(String),
+    visibleTabs: formData.getAll("visibleTabs").map(String),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
   }
+
+  // Zavrzi morebitne neveljavne vrednosti iz surovega form-vnosa -- edine dovoljene so obstoječi
+  // NAV_TABS hrefi.
+  const validHrefs = new Set(NAV_TABS.map((tab) => tab.href));
+  const visibleTabs = parsed.data.visibleTabs.filter((href) => validHrefs.has(href));
 
   const target = await prisma.user.findUnique({
     where: { id: parsed.data.userId },
@@ -197,6 +204,7 @@ export async function updateUser(_prevState: EditUserState, formData: FormData):
         ...(passwordHash ? { passwordHash } : {}),
         vehicleAccess: { create: vehicleIds.map((vehicleId) => ({ vehicleId })) },
         vehicleGroupAccess: { create: groupIds.map((groupId) => ({ groupId })) },
+        visibleTabs,
       },
     }),
   ]);
@@ -207,6 +215,9 @@ export async function updateUser(_prevState: EditUserState, formData: FormData):
   }
   if (target.vehicleGroupAccess.length !== groupIds.length) {
     changes.groupIds = { from: target.vehicleGroupAccess.length, to: groupIds.length };
+  }
+  if (JSON.stringify([...target.visibleTabs].sort()) !== JSON.stringify([...visibleTabs].sort())) {
+    changes.visibleTabs = { from: target.visibleTabs, to: visibleTabs };
   }
 
   await logAudit({

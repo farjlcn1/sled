@@ -19,7 +19,7 @@ export function EditUserDialog({
   groups,
   isSudo,
 }: {
-  targetUser: { id: string; email: string; level: Level; vehicleIds: string[]; groupIds: string[] };
+  targetUser: { id: string; email: string; level: Level; vehicleIds: string[]; groupIds: string[]; visibleTabs: string[] };
   vehicles: { id: string; plate: string }[];
   groups: { id: string; name: string }[];
   isSudo: boolean;
@@ -31,7 +31,14 @@ export function EditUserDialog({
   // Urejanje uporabnikov je omejeno na sudo (glej actions.ts) -- ta gumb/dialog se ostalim sploh ne prikaže.
   if (!isSudo) return null;
 
-  const visibleTabLabels = NAV_TABS.filter((tab) => tab.show(LEVEL_PERMISSIONS[level])).map((tab) => tab.label);
+  // Privzeto (dokler admin ročno ne odkljuka/odkljuka) sledi vlogi, izbrani OB ODPRTJU dialoga --
+  // enako kot pri vehicleIds/groupIds spodaj je to "defaultChecked" (nekontroliran vnos), zato se
+  // ne posodablja živo, če admin med urejanjem spremeni Nivo (uporabnik lahko po shranitvi ponovno
+  // odpre dialog in po potrebi doklika novo odprte zavihke).
+  const defaultVisibleHrefs =
+    targetUser.visibleTabs.length > 0
+      ? new Set(targetUser.visibleTabs)
+      : new Set(NAV_TABS.filter((tab) => tab.show(LEVEL_PERMISSIONS[targetUser.level])).map((tab) => tab.href));
 
   const showGroupAccess = level === "U";
   const showVehicleAccess = level === "U" || level === "DEMO";
@@ -73,11 +80,23 @@ export function EditUserDialog({
                   </option>
                 ))}
               </select>
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                Zavihki, ki jih bo uporabnik videl:{" "}
-                <span className="text-gray-700 dark:text-gray-300">{visibleTabLabels.join(", ")}</span>
-              </p>
             </div>
+
+            <fieldset>
+              <legend className="text-sm font-medium text-gray-700 dark:text-gray-300">Vidni zavihki</legend>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Uporabnik vidi samo odkljukane zavihke. Dejanski dostop do posamezne strani/akcije to ne
+                spremeni — določa ga še vedno Nivo zgoraj.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-4">
+                {NAV_TABS.map((tab) => (
+                  <label key={tab.href} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input type="checkbox" name="visibleTabs" value={tab.href} defaultChecked={defaultVisibleHrefs.has(tab.href)} />
+                    {tab.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">

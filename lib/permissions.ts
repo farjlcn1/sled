@@ -36,3 +36,12 @@ export const NAV_TABS: { href: string; label: string; show: (p: PermissionFlags)
   { href: "/admin/paketi", label: "Paketi", show: (p) => p.canManagePlatform },
   { href: "/revizijska-sled", label: "Revizijska sled", show: (p) => p.canManagePlatform },
 ];
+
+// Prazen visibleTabsOverride (privzeto stanje za vse obstoječe uporabnike) pomeni "brez posebne
+// omejitve" -- vidni zavihki so tedaj v celoti določeni z vlogo/pravicami (NAV_TABS.show). Ne-prazen
+// seznam je NEPOSREDNA zamenjava tega privzetka (torej ne presek z vlogo) -- glej opombo ob
+// visibleTabs v schema.prisma za razlog (dejanski dostop do strani/akcij ostaja neodvisno preverjen).
+export function effectiveVisibleHrefs(permissions: PermissionFlags, visibleTabsOverride: string[]): Set<string> {
+  if (visibleTabsOverride.length > 0) return new Set(visibleTabsOverride);
+  return new Set(NAV_TABS.filter((tab) => tab.show(permissions)).map((tab) => tab.href));
+}

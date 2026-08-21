@@ -157,6 +157,14 @@ model User {
   // uporabnika ne glede na katero vozilo gleda, shranjeno da ni treba izbirati ob vsaki prijavi.
   visibleVehicleFields String[] @default([])
 
+  // Kateri zavihki (glej NAV_TABS v lib/permissions.ts) so za TEGA uporabnika vidni v navigaciji --
+  // prazen seznam pomeni "brez posebne omejitve" (privzeto po vlogi/pravicah, torej NAV_TABS.show),
+  // ne-prazen seznam pa je NEPOSREDNA zamenjava tega privzetka (ne presek z vlogo). Ta nastavitev
+  // je samo za prikaz navigacije -- dejanski dostop do strani/akcij še vedno preverjajo obstoječi
+  // canManageX flagi neodvisno, zato skrit/prikazan zavihek tu ne more niti razširiti niti zožiti
+  // dejanskih pravic.
+  visibleTabs String[] @default([])
+
   vehicleAccess      UserVehicleAccess[]
   vehicleGroupAccess UserVehicleGroupAccess[]
 

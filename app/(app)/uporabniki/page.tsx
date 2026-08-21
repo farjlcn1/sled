@@ -54,6 +54,7 @@ export default async function UporabnikiPage({
     isActive: u.isActive,
     vehicleIds: u.vehicleAccess.map((a) => a.vehicleId),
     groupIds: u.vehicleGroupAccess.map((a) => a.groupId),
+    visibleTabs: u.visibleTabs,
   }));
 
   return (

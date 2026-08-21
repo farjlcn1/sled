@@ -22,6 +22,7 @@ export type UserRow = {
   isActive: boolean;
   vehicleIds: string[];
   groupIds: string[];
+  visibleTabs: string[];
 };
 
 type SortDir = "asc" | "desc";
@@ -116,6 +117,7 @@ export function UsersTable({
                       level: u.level,
                       vehicleIds: u.vehicleIds,
                       groupIds: u.groupIds,
+                      visibleTabs: u.visibleTabs,
                     }}
                     vehicles={vehicles}
                     groups={groups}

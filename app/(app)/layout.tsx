@@ -2,12 +2,13 @@ import { requireUser } from "@/lib/auth/session";
 import { LogoutButton } from "@/components/logout-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NavLinks } from "@/components/nav-links";
-import { NAV_TABS } from "@/lib/permissions";
+import { NAV_TABS, effectiveVisibleHrefs } from "@/lib/permissions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
 
-  const links = NAV_TABS.map((tab) => ({ href: tab.href, label: tab.label, show: tab.show(user) }));
+  const visibleHrefs = effectiveVisibleHrefs(user, user.visibleTabs);
+  const links = NAV_TABS.map((tab) => ({ href: tab.href, label: tab.label, show: visibleHrefs.has(tab.href) }));
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

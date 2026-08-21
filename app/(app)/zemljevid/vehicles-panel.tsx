@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VehicleMap, type HistoryRoute } from "@/components/vehicle-map";
 import { SlovenianDateInput } from "@/components/date-input";
@@ -100,6 +100,7 @@ export function VehiclesPanel({
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"vozila" | "skupine">("vozila");
+  const [vehicleSearch, setVehicleSearch] = useState("");
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set());
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; target: ContextMenuTarget } | null>(null);
@@ -175,13 +176,16 @@ export function VehiclesPanel({
   function applyDragRange(currentId: string) {
     const anchorId = dragAnchorIdRef.current;
     if (!anchorId) return;
-    const anchorIdx = vehicles.findIndex((v) => v.id === anchorId);
-    const currentIdx = vehicles.findIndex((v) => v.id === currentId);
+    // Razpon po TRENUTNO PRIKAZANEM (filtriranem) seznamu -- sicer bi vlečenje čez dve vrstici,
+    // ki sta si vizualno blizu samo zaradi iskalnega filtra, pobralo tudi skrita (odfiltrirana)
+    // vozila med njima v NEfiltriranem vrstnem redu.
+    const anchorIdx = filteredVehicles.findIndex((v) => v.id === anchorId);
+    const currentIdx = filteredVehicles.findIndex((v) => v.id === currentId);
     if (anchorIdx === -1 || currentIdx === -1) return;
     const lo = Math.min(anchorIdx, currentIdx);
     const hi = Math.max(anchorIdx, currentIdx);
     const next = new Set(dragSnapshotRef.current);
-    for (let i = lo; i <= hi; i++) next.add(vehicles[i].id);
+    for (let i = lo; i <= hi; i++) next.add(filteredVehicles[i].id);
     setCheckedIds(next);
   }
 
@@ -214,10 +218,24 @@ export function VehiclesPanel({
     return () => window.removeEventListener("mouseup", stopDragging);
   }, []);
 
-  const allChecked = vehicles.length > 0 && vehicles.every((v) => checkedIds.has(v.id));
+  // Ujema plate/znamko+model/voznika -- necuceljivo na velike/male crke, brez presledkov na
+  // robovih. "Izberi vsa vozila" spodaj upošteva samo trenutno prikazan (filtriran) nabor, ne
+  // vseh vozil, da iskanje + "izberi vse" skupaj delujeta smiselno (izberi vse NAJDENO).
+  const filteredVehicles = useMemo(() => {
+    const q = vehicleSearch.trim().toLowerCase();
+    if (!q) return vehicles;
+    return vehicles.filter(
+      (v) =>
+        v.plate.toLowerCase().includes(q) ||
+        v.brandModel.toLowerCase().includes(q) ||
+        (v.driverName?.toLowerCase().includes(q) ?? false)
+    );
+  }, [vehicles, vehicleSearch]);
+
+  const allChecked = filteredVehicles.length > 0 && filteredVehicles.every((v) => checkedIds.has(v.id));
 
   function toggleAll() {
-    setCheckedIds(allChecked ? new Set() : new Set(vehicles.map((v) => v.id)));
+    setCheckedIds(allChecked ? new Set() : new Set(filteredVehicles.map((v) => v.id)));
   }
 
   function toggleGroupExpanded(groupId: string) {
@@ -366,11 +384,19 @@ export function VehiclesPanel({
                         }
                       />
                     </th>
-                    <th className="px-3 py-2" />
+                    <th className="px-3 py-2">
+                      <input
+                        type="text"
+                        value={vehicleSearch}
+                        onChange={(e) => setVehicleSearch(e.target.value)}
+                        placeholder="Išči vozilo …"
+                        className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                      />
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {vehicles.map((v) => (
+                  {filteredVehicles.map((v) => (
                     <VehicleRow
                       key={v.id}
                       vehicleId={v.id}
@@ -393,10 +419,10 @@ export function VehiclesPanel({
                       onLoadHistory={(vehicleId, label) => openHistoryDialogForIds([vehicleId], label)}
                     />
                   ))}
-                  {vehicles.length === 0 && (
+                  {filteredVehicles.length === 0 && (
                     <tr>
                       <td colSpan={2} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                        Ni še vozil.
+                        {vehicles.length === 0 ? "Ni še vozil." : "Ni vozil, ki bi ustrezala iskanju."}
                       </td>
                     </tr>
                   )}

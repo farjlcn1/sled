@@ -289,6 +289,11 @@ export function VehiclesPanel({
   const vehiclesById = new Map(vehicles.map((v) => [v.id, v]));
   const focusedVehicle = focusedVehicleId ? (vehiclesById.get(focusedVehicleId) ?? null) : null;
 
+  // Koliko tabel zgodovine je trenutno dejansko prikazanih (brez tistih z napako) -- vsaka od
+  // njih dobi enakovreden delez visinskega "budgeta", da vec hkrati odkljukanih vozil skupaj ne
+  // razpotegne seznama veliko nizje, kot sega zemljevid (glej VehicleHistoryTable).
+  const visibleTableCount = selections.filter((s) => !s.error).length;
+
   return (
     <div className="space-y-6 pb-24">
       <div
@@ -526,6 +531,7 @@ export function VehiclesPanel({
               onSelectedIndicesChange={(next) =>
                 setPointSelection((prev) => ({ ...prev, [s.vehicleId]: next }))
               }
+              visibleTableCount={visibleTableCount}
             />
           )}
         </div>

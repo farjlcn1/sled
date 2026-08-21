@@ -63,6 +63,7 @@ export function VehicleHistoryTable({
   exportHref,
   selectedIndices,
   onSelectedIndicesChange,
+  visibleTableCount,
 }: {
   plate: string;
   rows: HistoryRow[];
@@ -70,6 +71,7 @@ export function VehicleHistoryTable({
   exportHref: string;
   selectedIndices: Set<number>;
   onSelectedIndicesChange: (next: Set<number>) => void;
+  visibleTableCount: number;
 }) {
   const [visibleFields, setVisibleFields] = useState<string[]>(initialVisibleFields);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -84,20 +86,25 @@ export function VehicleHistoryTable({
 
   // 512px je bil prej fiksen -- ker je nad to tabelo vozni sklop (zemljevid, "Danes" ipd.)
   // spremenljive višine, samo fiksno privzeto število ne zagotovi, da je tabela v celoti
-  // vidna brez scrollanja strani. Namesto tega ob prvem izrisu izmerimo, koliko prostora
-  // dejansko preostane od vrha te tabele do dna okna, in privzeto višino nastavimo na to --
-  // navzgor pa omejeno na višino zemljevida, da pri več hkrati odkljukanih vozilih (torej več
-  // tabel druga pod drugo) vsaka posebej ne poskuša spet segati do dna zaslona in jih skupaj
-  // ne "razpotegne" veliko nižje, kot sega zemljevid.
+  // vidna brez scrollanja strani. Namesto tega izmerimo, koliko prostora dejansko preostane
+  // od vrha te tabele do dna okna, privzeto višino pa nastavimo na to -- omejeno na višino
+  // zemljevida, deljeno s številom trenutno prikazanih tabel (visibleTableCount). Brez delitve bi
+  // pri več hkrati odkljukanih vozilih (torej več tabel druga pod drugo) vsaka posebej spet
+  // poskusila segati do (skoraj) polne višine zemljevida, njihova VSOTA pa bi seznam "razpotegnila"
+  // veliko nižje, kot sega zemljevid. Ker se že obstoječi (prej izrisani) primerki te tabele ob
+  // dodajanju novega vozila v izbiro ne remountajo (isti key), mora efekt znova steči ob vsaki
+  // spremembi visibleTableCount, ne le ob prvem izrisu -- zato je pravi (edini) odvisnik.
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const available = window.innerHeight - rect.top - 24;
-    const mapHeight = document.querySelector(".maplibregl-map")?.getBoundingClientRect().height ?? Infinity;
-    setTableHeight(Math.max(200, Math.round(Math.min(available, mapHeight))));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- samo ob prvem izrisu te (nove) komponente
-  }, []);
+    const mapHeightRaw = document.querySelector(".maplibregl-map")?.getBoundingClientRect().height;
+    const mapHeight = mapHeightRaw && Number.isFinite(mapHeightRaw) ? mapHeightRaw : available;
+    const budget = Math.min(available, mapHeight);
+    const perTable = visibleTableCount > 1 ? budget / visibleTableCount : budget;
+    setTableHeight(Math.max(200, Math.round(perTable)));
+  }, [visibleTableCount]);
 
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {

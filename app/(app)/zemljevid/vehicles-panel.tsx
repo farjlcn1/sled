@@ -106,6 +106,26 @@ export function VehiclesPanel({
   // Zadnje kliknjeno (odkljukano) vozilo -- zanj prikažemo "Danes" podokno desno od zemljevida.
   const [focusedVehicleId, setFocusedVehicleId] = useState<string | null>(null);
 
+  // Varovalka poleg delitve visine v VehicleHistoryTable (glej tam): ce je odkljukanih vozil
+  // toliko, da delitev pri vsakem posebej trci ob spodnjo mejo 200px, se njihova VSOTA se vedno
+  // lahko razteza dlje kot zemljevid. Zato seznam naloženih tabel (kadar je vec kot 1) dodatno
+  // omejimo na visino zemljevida navzven, znotraj pa scrolla samostojno -- stran sama se torej
+  // nikoli ne raztegne dlje, ne glede na stevilo hkrati odkljukanih vozil.
+  const selectionsListRef = useRef<HTMLDivElement>(null);
+  const [selectionsMaxHeight, setSelectionsMaxHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    const mapEl = document.querySelector<HTMLElement>(".maplibregl-map");
+    if (!mapEl) return;
+    function update() {
+      setSelectionsMaxHeight(mapEl!.getBoundingClientRect().height);
+    }
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(mapEl);
+    return () => ro.disconnect();
+  }, []);
+
   useEffect(() => {
     if (!contextMenu) return;
     function close() {
@@ -290,8 +310,9 @@ export function VehiclesPanel({
   const focusedVehicle = focusedVehicleId ? (vehiclesById.get(focusedVehicleId) ?? null) : null;
 
   // Koliko tabel zgodovine je trenutno dejansko prikazanih (brez tistih z napako) -- vsaka od
-  // njih dobi enakovreden delez visinskega "budgeta", da vec hkrati odkljukanih vozil skupaj ne
-  // razpotegne seznama veliko nizje, kot sega zemljevid (glej VehicleHistoryTable).
+  // njih dobi enakovreden delez visinskega "budgeta" (glej VehicleHistoryTable), spodnji seznam
+  // pa je poleg tega (kot varovalka za primer, ko delitev pri velikem stevilu vozil trci ob
+  // spodnjo mejo 200px) navzven ves skupaj omejen na visino zemljevida -- glej selectionsMaxHeight.
   const visibleTableCount = selections.filter((s) => !s.error).length;
 
   return (
@@ -513,29 +534,39 @@ export function VehiclesPanel({
         {focusedVehicle && <TodaySummaryPanel vehicleId={focusedVehicle.id} plate={focusedVehicle.plate} />}
       </div>
 
-      {selections.map((s) => (
-        <div key={s.vehicleId} className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
-          {s.error ? (
-            <>
-              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{s.plate}</p>
-              <p className="text-sm text-red-600 dark:text-red-400">{s.error}</p>
-            </>
-          ) : (
-            <VehicleHistoryTable
-              key={`${s.vehicleId}-${s.from}-${s.to}`}
-              plate={s.plate}
-              rows={s.rows}
-              initialVisibleFields={initialVisibleFields}
-              exportHref={`/api/zemljevid/izvoz?vozilo=${s.vehicleId}&from=${s.from}&to=${s.to}`}
-              selectedIndices={pointSelection[s.vehicleId] ?? new Set()}
-              onSelectedIndicesChange={(next) =>
-                setPointSelection((prev) => ({ ...prev, [s.vehicleId]: next }))
-              }
-              visibleTableCount={visibleTableCount}
-            />
-          )}
-        </div>
-      ))}
+      <div
+        ref={selectionsListRef}
+        style={
+          visibleTableCount > 1 && selectionsMaxHeight
+            ? { maxHeight: selectionsMaxHeight, overflowY: "auto" }
+            : undefined
+        }
+        className="space-y-6"
+      >
+        {selections.map((s) => (
+          <div key={s.vehicleId} className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
+            {s.error ? (
+              <>
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{s.plate}</p>
+                <p className="text-sm text-red-600 dark:text-red-400">{s.error}</p>
+              </>
+            ) : (
+              <VehicleHistoryTable
+                key={`${s.vehicleId}-${s.from}-${s.to}`}
+                plate={s.plate}
+                rows={s.rows}
+                initialVisibleFields={initialVisibleFields}
+                exportHref={`/api/zemljevid/izvoz?vozilo=${s.vehicleId}&from=${s.from}&to=${s.to}`}
+                selectedIndices={pointSelection[s.vehicleId] ?? new Set()}
+                onSelectedIndicesChange={(next) =>
+                  setPointSelection((prev) => ({ ...prev, [s.vehicleId]: next }))
+                }
+                visibleTableCount={visibleTableCount}
+              />
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

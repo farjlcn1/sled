@@ -27,11 +27,11 @@ chmod 600 /etc/postfix/mail.farjolcn.com.key
 chown root:root /etc/postfix/mail.farjolcn.com.key
 
 echo "== Namescam OpenDKIM konfiguracijo in kljuc =="
+mkdir -p /etc/opendkim/keys/farjolcn.com
 cp "$SCRIPT_DIR/opendkim.conf" /etc/opendkim.conf
 cp "$SCRIPT_DIR/TrustedHosts" /etc/opendkim/TrustedHosts
 cp "$SCRIPT_DIR/KeyTable" /etc/opendkim/KeyTable
 cp "$SCRIPT_DIR/SigningTable" /etc/opendkim/SigningTable
-mkdir -p /etc/opendkim/keys/farjolcn.com
 cp "$SCRIPT_DIR/dkim-keys/mail.private" /etc/opendkim/keys/farjolcn.com/mail.private
 chown -R opendkim:opendkim /etc/opendkim/keys
 chmod 700 /etc/opendkim/keys/farjolcn.com

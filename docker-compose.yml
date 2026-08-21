@@ -72,6 +72,9 @@ services:
       SMS_GATEWAY_SOCKET: /run/sledenje-sms.sock
     ports:
       - "127.0.0.1:3002:3000"
+    # host.docker.internal -> gostiteljev Postfix (glej deploy/mail-relay/), za SMTP_HOST v .env.production.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # Most do ModemManager na gostitelju za pošiljanje SMS (glej deploy/sms-gateway/) --
       # vsebnik nima in ne potrebuje neposrednega dostopa do USB/D-Bus strojne opreme.

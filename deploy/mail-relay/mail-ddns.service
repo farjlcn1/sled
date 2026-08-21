@@ -1,0 +1,10 @@
+[Unit]
+Description=Posodobitev mail.farjolcn.com DDNS zapisa (Cloudflare)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+LoadCredential=cf-token:/etc/mail-ddns/cloudflare-token
+ExecStart=/usr/bin/python3 /opt/mail-ddns/mail-ddns-update.py

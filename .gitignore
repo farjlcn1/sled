@@ -44,3 +44,7 @@ next-env.d.ts
 
 # prisma generated client
 /generated
+
+# zasebni ključi za mail-relay (DKIM + TLS) -- specifični za to eno namestitev, nikoli v git.
+deploy/mail-relay/dkim-keys/mail.private
+deploy/mail-relay/mail.farjolcn.com.key

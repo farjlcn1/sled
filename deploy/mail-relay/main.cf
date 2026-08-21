@@ -1,0 +1,55 @@
+# Postfix -- SAMO odhodni rele za sled/teren (nima lokalnih predalov, ne sprejema poste iz
+# interneta, ni mozno uporabiti kot odprt relay). Namescen na /etc/postfix/main.cf (glej setup.sh).
+#
+# Aplikacije (Docker vsebniki) se povezejo prek host.docker.internal:25 (glej docker-compose.yml
+# extra_hosts), Postfix pa iz tega gostitelja dostavi neposredno na MX prejemnika (Gmail, Outlook ...).
+
+myhostname = mail.farjolcn.com
+mydomain = farjolcn.com
+myorigin = $mydomain
+# NE "all" -- posluša samo na loopback + docker0 gateway IP (kamor kaže host.docker.internal iz
+# obeh vsebnikov, preverjeno), namenoma NE na javnem vmesniku. Izhodne povezave (dostava na
+# Gmail/Outlook MX) na to niso vezane, gredo prek običajne poti ne glede na to nastavitev.
+inet_interfaces = 127.0.0.1, 172.17.0.1
+inet_protocols = ipv4
+compatibility_level = 3
+
+# Brez lokalnih predalov/domen -- vse gre navzven, nič se ne dostavlja lokalno.
+mydestination =
+local_recipient_maps =
+alias_maps =
+alias_database =
+
+# Zaupamo SAMO temu gostitelju in Dockerjevim internim omrezjem (sled_default 172.19.0.0/16,
+# teren_default 172.18.0.0/16, oboje znotraj 172.16.0.0/12) -- karkoli drugega je zavrnjeno,
+# da to nikoli ne postane odprt relay.
+mynetworks_style = subnet
+mynetworks = 127.0.0.0/8, 172.16.0.0/12
+smtpd_relay_restrictions = permit_mynetworks, reject_unauth_destination
+smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination
+smtpd_helo_required = yes
+disable_vrfy_command = yes
+smtpd_banner = $myhostname ESMTP
+
+# Opportunistic TLS (STARTTLS) -- samo-podpisan certifikat kot izhodisce; ce se kasneje uredi
+# javno dostopen mail.farjolcn.com, ga je smiselno zamenjati z Let's Encrypt (ni nujno za
+# delovanje, samo za "pravi" certifikat namesto samo-podpisanega).
+smtpd_tls_cert_file = /etc/postfix/mail.farjolcn.com.crt
+smtpd_tls_key_file = /etc/postfix/mail.farjolcn.com.key
+smtpd_tls_security_level = may
+smtp_tls_security_level = may
+smtp_tls_loglevel = 1
+smtpd_tls_loglevel = 1
+
+# DKIM podpisovanje prek OpenDKIM (glej opendkim.conf) -- tempfail (namesto accept), ce
+# OpenDKIM ne odgovori, da nikoli ne posljemo NEpodpisane poste po pomoti.
+milter_default_action = tempfail
+milter_protocol = 6
+smtpd_milters = inet:127.0.0.1:8891
+non_smtpd_milters = inet:127.0.0.1:8891
+
+# Umirjen tempo navzven -- nov posiljatelj brez zgodovine naj posilja postopoma, ne v sunkih
+# (prejemniki sunkovito pošiljanje pogosteje ocenijo kot spam/bot vzorec).
+default_destination_rate_delay = 1s
+smtp_destination_rate_delay = 1s
+default_destination_concurrency_limit = 5

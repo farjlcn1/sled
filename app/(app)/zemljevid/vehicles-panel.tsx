@@ -12,9 +12,11 @@ import { GroupRow } from "./group-row";
 import { VehicleHistoryTable } from "./vehicle-history-table";
 import { TodaySummaryPanel } from "./today-summary-panel";
 
-// Mora ustrezati VehicleMap-ovi lastni (trenutno fiksni) višini spodaj, da se stranski
-// seznam navidezno "razteza" na enako višino kot zemljevid, ko je vozil dovolj za scroll.
-const SIDEBAR_MAX_HEIGHT = "max(75vh, 520px)";
+// Uporabljeno samo dokler se ne izmeri dejanska višina zemljevida (glej selectionsMaxHeight
+// spodaj) -- prejšnji pristop (fiksno "max(75vh, 520px)", neodvisno od zemljevida) je na visjih
+// oknih presegel dejansko visino zemljevida, ker 75vh na visjem oknu zlahka prese ~750px, kolikor
+// je zemljevid dejansko visok.
+const SIDEBAR_FALLBACK_MAX_HEIGHT = "max(75vh, 520px)";
 
 export type VehicleListItem = {
   id: string;
@@ -106,11 +108,16 @@ export function VehiclesPanel({
   // Zadnje kliknjeno (odkljukano) vozilo -- zanj prikažemo "Danes" podokno desno od zemljevida.
   const [focusedVehicleId, setFocusedVehicleId] = useState<string | null>(null);
 
-  // Varovalka poleg delitve visine v VehicleHistoryTable (glej tam): ce je odkljukanih vozil
-  // toliko, da delitev pri vsakem posebej trci ob spodnjo mejo 200px, se njihova VSOTA se vedno
-  // lahko razteza dlje kot zemljevid. Zato seznam naloženih tabel (kadar je vec kot 1) dodatno
-  // omejimo na visino zemljevida navzven, znotraj pa scrolla samostojno -- stran sama se torej
-  // nikoli ne raztegne dlje, ne glede na stevilo hkrati odkljukanih vozil.
+  // Dejanska (trenutna) visina zemljevida -- uporabljena kot navzgor omejena visina za DVA
+  // ločena dela strani, ki naj vizualno ne segata nižje kot zemljevid:
+  // 1. Stranski seznam vozil (glej spodaj) -- prejšnja fiksna ocena "max(75vh, 520px)" je na
+  //    visjih oknih presegla dejansko (fiksno ~745px) visino zemljevida, ker 75vh na visjem oknu
+  //    zlahka prese to vrednost.
+  // 2. Seznam naloženih tabel zgodovine (glej spodaj) -- varovalka poleg delitve visine v
+  //    VehicleHistoryTable (glej tam): ce je odkljukanih vozil toliko, da delitev pri vsakem
+  //    posebej trci ob spodnjo mejo 200px, se njihova VSOTA se vedno lahko razteza dlje kot
+  //    zemljevid.
+  // ResizeObserver poskrbi, da se oba ujemata tudi, ce uporabnik zemljevid rocno poveca/zmanjsa.
   const selectionsListRef = useRef<HTMLDivElement>(null);
   const [selectionsMaxHeight, setSelectionsMaxHeight] = useState<number | null>(null);
 
@@ -322,7 +329,7 @@ export function VehiclesPanel({
       >
         <div
           className="relative self-start overflow-x-auto overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700"
-          style={{ maxHeight: SIDEBAR_MAX_HEIGHT }}
+          style={{ maxHeight: selectionsMaxHeight ?? SIDEBAR_FALLBACK_MAX_HEIGHT }}
         >
           <div className="sticky top-0 z-10 flex border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
             <button type="button" onClick={() => setActiveTab("vozila")} className={tabClass(activeTab === "vozila")}>

@@ -14,6 +14,11 @@ export async function sendMail({ to, subject, text }: { to: string; subject: str
     port: Number(process.env.SMTP_PORT ?? 587),
     secure: process.env.SMTP_SECURE === "true",
     auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined,
+    // Rele uporablja samo-podpisan certifikat (glej deploy/mail-relay/) -- v redu je, ker je ta
+    // povezava zaupana po omrežni poti (Docker bridge, ne internet), ne po identiteti
+    // certifikata. Node privzeto (tudi pri opportunistic STARTTLS) zavrne samo-podpisan
+    // certifikat, zato tu preverjanje verige izklopimo samo za TA lokalni rele.
+    tls: { rejectUnauthorized: false },
   });
 
   await transporter.sendMail({

@@ -1,5 +1,8 @@
-# Postfix -- SAMO odhodni rele za sled/teren (nima lokalnih predalov, ne sprejema poste iz
-# interneta, ni mozno uporabiti kot odprt relay). Namescen na /etc/postfix/main.cf (glej setup.sh).
+# Postfix -- odhodni rele za sled/teren + minimalno sprejemanje za NASLOV POSILJATELJA
+# (obvestila@farjolcn.com), ker nekateri prejemniki (npr. mx1.mega-m.net, ki gosti sledenje.com)
+# pred sprejemom poste NAZAJ preverijo (t.i. "sender callback verification"), ali ta naslov sploh
+# obstaja -- brez tega korak spodaj zavrnejo z "550 Sender verification failed". Namescen na
+# /etc/postfix/main.cf (glej setup.sh).
 #
 # Aplikacije (Docker vsebniki) se povezejo prek host.docker.internal:25 (glej docker-compose.yml
 # extra_hosts), Postfix pa iz tega gostitelja dostavi neposredno na MX prejemnika (Gmail, Outlook ...).
@@ -7,16 +10,20 @@
 myhostname = mail.farjolcn.com
 mydomain = farjolcn.com
 myorigin = $mydomain
-# NE "all" -- posluša samo na loopback + docker0 gateway IP (kamor kaže host.docker.internal iz
-# obeh vsebnikov, preverjeno), namenoma NE na javnem vmesniku. Izhodne povezave (dostava na
-# Gmail/Outlook MX) na to niso vezane, gredo prek običajne poti ne glede na to nastavitev.
-inet_interfaces = 127.0.0.1, 172.17.0.1
+# "all" (ne samo loopback/docker0) -- zdaj NUJNO, da lahko od zunaj (internet) sploh pride do
+# zgornje verifikacije naslova posiljatelja. Varno je, ker spodaj sprejemamo SAMO EN naslov
+# (obvestila@farjolcn.com, glej local_recipient_maps) in ga takoj zavržemo (transport_maps:
+# discard) -- ni pravega predala, ni mozno uporabiti kot odprt relay (glej
+# smtpd_relay_restrictions/smtpd_recipient_restrictions spodaj, nespremenjeno).
+inet_interfaces = all
 inet_protocols = ipv4
 compatibility_level = 3
 
-# Brez lokalnih predalov/domen -- vse gre navzven, nič se ne dostavlja lokalno.
-mydestination =
-local_recipient_maps =
+# Edina "lokalna" domena/naslov je natanko ta en sink za sender-verifikacijo -- vse ostalo (tudi
+# druge naslove @farjolcn.com) Postfix zavrne kot "user unknown", ne sprejme na slepo.
+mydestination = farjolcn.com
+local_recipient_maps = hash:/etc/postfix/local_valid_recipient
+transport_maps = hash:/etc/postfix/transport
 alias_maps =
 alias_database =
 

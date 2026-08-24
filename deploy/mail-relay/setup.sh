@@ -26,6 +26,13 @@ chmod 644 /etc/postfix/mail.farjolcn.com.crt
 chmod 600 /etc/postfix/mail.farjolcn.com.key
 chown root:root /etc/postfix/mail.farjolcn.com.key
 
+# Edini "lokalni" naslov (sender-verifikacijski sink, glej main.cf) -- sprejet in takoj zavržen,
+# ni pravi predal.
+cp "$SCRIPT_DIR/local_valid_recipient" /etc/postfix/local_valid_recipient
+cp "$SCRIPT_DIR/transport" /etc/postfix/transport
+postmap /etc/postfix/local_valid_recipient
+postmap /etc/postfix/transport
+
 echo "== Namescam OpenDKIM konfiguracijo in kljuc =="
 mkdir -p /etc/opendkim/keys/farjolcn.com
 cp "$SCRIPT_DIR/opendkim.conf" /etc/opendkim.conf

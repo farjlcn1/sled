@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
-import { getTraccarRoute } from "@/lib/traccar";
+import { getTraccarPositions, getTraccarRoute } from "@/lib/traccar";
 import { vehicleWhereForUser } from "@/lib/vehicle-access";
 import { deriveVehicleStatus, type VehicleStatus } from "@/lib/vehicle-status";
 import { isMoving } from "@/lib/trips";
@@ -34,15 +34,23 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Vozilo ni na voljo." }, { status: 404 });
   }
 
-  const now = new Date();
-  const windowStart = new Date(now.getTime() - WINDOW_HOURS * 3600 * 1000);
-  const positions = await getTraccarRoute(vehicle.device.traccarDeviceId, windowStart, now);
-  if (positions.length === 0) {
+  // Traccarjev /api/positions (brez časovnega okna) vedno vrne resnično zadnjo znano pozicijo,
+  // ne glede na to, kako stara je -- prej je bilo to okno vezano na trenutni čas (zadnjih 7 dni od
+  // "zdaj"), zato je vozilo, ki ni oddajalo dlje kot teden dni (npr. testni podatki z ustavljenim
+  // seed-om, ali pravo vozilo v servisu), povsem izginilo iz tega podokna, čeprav je njegova
+  // zadnja pozicija še vedno na voljo in bi jo bilo smiselno prikazati (z ustrezno starim časom).
+  const [last] = await getTraccarPositions([vehicle.device.traccarDeviceId]);
+  if (!last) {
     return NextResponse.json({ error: "Ni podatkov." }, { status: 404 });
   }
-
-  const last = positions[positions.length - 1];
   const lastMoving = isMoving(last, vehicle.minMovingSpeedKmh);
+
+  // "Kako dolgo v trenutnem stanju" še vedno potrebuje zgodovino nazaj -- okno je zdaj vezano na
+  // ČAS ZADNJE POZICIJE (last.fixTime), ne na trenutni čas, da izračun deluje enako ne glede na to,
+  // kako davno je vozilo nazadnje oddajalo.
+  const anchor = new Date(last.fixTime);
+  const windowStart = new Date(anchor.getTime() - WINDOW_HOURS * 3600 * 1000);
+  const positions = await getTraccarRoute(vehicle.device.traccarDeviceId, windowStart, anchor);
 
   let stateStart = last.fixTime;
   for (let i = positions.length - 2; i >= 0; i--) {

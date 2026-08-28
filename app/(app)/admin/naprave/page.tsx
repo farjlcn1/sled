@@ -127,7 +127,7 @@ export default async function NapravePage({
         </label>
         <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
           Letnik vozila
-          <input type="number" name="letnik" defaultValue={filters.letnik} className={fieldClass()} />
+          <input type="number" name="letnik" defaultValue={filters.letnik} className={`${fieldClass()} no-spinner`} />
         </label>
         <div className="col-span-2 flex items-end gap-2 sm:col-span-4">
           <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">
@@ -138,15 +138,6 @@ export default async function NapravePage({
           </a>
         </div>
       </form>
-
-      <div className="flex justify-end">
-        <a
-          href="/api/naprave/izvoz"
-          className="inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
-        >
-          Izvoz
-        </a>
-      </div>
 
       <DevicesTable devices={deviceRows} tenants={tenants} />
     </div>

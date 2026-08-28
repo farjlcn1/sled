@@ -134,6 +134,9 @@ export function DevicesTable({
           >
             SMS
           </button>
+          <a href="/api/naprave/izvoz" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+            Izvoz
+          </a>
           {checked.size > 0 && (
             <span className="text-sm text-gray-500 dark:text-gray-400">Izbranih: {checked.size}</span>
           )}

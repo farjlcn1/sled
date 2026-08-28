@@ -125,22 +125,26 @@ export function DevicesTable({
   return (
     <>
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setSmsOpen(true)}
-            disabled={checked.size === 0}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            SMS
-          </button>
-          <a href="/api/naprave/izvoz" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">
-            Izvoz
-          </a>
-          {checked.size > 0 && (
-            <span className="text-sm text-gray-500 dark:text-gray-400">Izbranih: {checked.size}</span>
-          )}
-          {smsMessage && <span className="text-sm text-gray-700 dark:text-gray-300">{smsMessage}</span>}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {checked.size > 0 && (
+              <span className="text-sm text-gray-500 dark:text-gray-400">Izbranih: {checked.size}</span>
+            )}
+            {smsMessage && <span className="text-sm text-gray-700 dark:text-gray-300">{smsMessage}</span>}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSmsOpen(true)}
+              disabled={checked.size === 0}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              SMS
+            </button>
+            <a href="/api/naprave/izvoz" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+              Izvoz
+            </a>
+          </div>
         </div>
 
         <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">

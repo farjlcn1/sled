@@ -1,7 +1,6 @@
 import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { vehicleWhereForUser } from "@/lib/vehicle-access";
-import { SelectAllToggle } from "./select-all-toggle";
 import { UploadForm } from "./upload-form";
 import { VehicleScheduleTable } from "./vehicle-schedule-table";
 import { DriverScheduleTable } from "./driver-schedule-table";
@@ -51,12 +50,23 @@ export default async function TachoPage({
             downloadedAt: true,
             periodFrom: true,
             periodTo: true,
+            vehicleId: true,
+            driverId: true,
             vehicle: { select: { plate: true } },
             driver: { select: { fullName: true } },
           },
         }),
       ])
     : [[], [], []];
+
+  // "files" je ze razvrscen po downloadedAt desc, zato je prvo ujemanje na vozilo/voznika
+  // hkrati zadnje nalozeno -- brez dodatne poizvedbe.
+  const lastFileByVehicle = new Map<string, { id: string; downloadedAt: Date }>();
+  const lastFileByDriver = new Map<string, { id: string; downloadedAt: Date }>();
+  for (const f of files) {
+    if (f.vehicleId && !lastFileByVehicle.has(f.vehicleId)) lastFileByVehicle.set(f.vehicleId, f);
+    if (f.driverId && !lastFileByDriver.has(f.driverId)) lastFileByDriver.set(f.driverId, f);
+  }
 
   return (
     <div className="space-y-8">
@@ -90,26 +100,30 @@ export default async function TachoPage({
       {tenantId && (
         <>
           <section className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Vozila — urnik prenosa (VU)</h2>
-              <SelectAllToggle tenantId={tenantId} action={setAllVehicleSchedules} label="Izberi vsa vozila" />
-            </div>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Vozila — urnik prenosa (VU)</h2>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Urnik služi kot opomnik, kdaj je treba prenesti podatke iz enote v vozilu (EU: največ 90 dni med prenosi) — ne sproži
               samodejnega prenosa.
             </p>
-            <VehicleScheduleTable vehicles={vehicles} action={toggleVehicleSchedule} />
+            <VehicleScheduleTable
+              vehicles={vehicles.map((v) => ({ ...v, lastFile: lastFileByVehicle.get(v.id) ?? null }))}
+              action={toggleVehicleSchedule}
+              tenantId={tenantId}
+              selectAllAction={setAllVehicleSchedules}
+            />
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Vozniki — urnik prenosa (kartica)</h2>
-              <SelectAllToggle tenantId={tenantId} action={setAllDriverSchedules} label="Izberi vse voznike" />
-            </div>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Vozniki — urnik prenosa (kartica)</h2>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               EU: kartico voznika je treba prenesti najkasneje vsakih 28 dni. Obdobje spodaj je opomnik, ne samodejen prenos.
             </p>
-            <DriverScheduleTable drivers={drivers} action={toggleDriverSchedule} />
+            <DriverScheduleTable
+              drivers={drivers.map((d) => ({ ...d, lastFile: lastFileByDriver.get(d.id) ?? null }))}
+              action={toggleDriverSchedule}
+              tenantId={tenantId}
+              selectAllAction={setAllDriverSchedules}
+            />
           </section>
 
           <section className="space-y-2">

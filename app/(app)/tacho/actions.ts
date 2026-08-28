@@ -93,28 +93,6 @@ export async function setAllDriverSchedules(tenantId: string, enabled: boolean) 
   revalidatePath("/tacho");
 }
 
-export async function setDriverPeriod(driverId: string, days: number) {
-  const user = await requireManager();
-  const driver = await prisma.driver.findUnique({ where: { id: driverId } });
-  if (!driver || (!user.canManagePlatform && driver.tenantId !== user.tenantId)) throw new Error("Voznik ni na voljo.");
-  if (!Number.isFinite(days) || days < 1 || days > 90) throw new Error("Obdobje mora biti med 1 in 90 dni.");
-  const roundedDays = Math.round(days);
-  await prisma.driver.update({ where: { id: driverId }, data: { tachoDownloadPeriodDays: roundedDays } });
-
-  await logAudit({
-    userId: user.id,
-    userEmail: user.email,
-    tenantId: driver.tenantId,
-    action: "UPDATE",
-    entityType: "Driver",
-    entityId: driverId,
-    entityLabel: driver.fullName,
-    changes: { tachoDownloadPeriodDays: { from: driver.tachoDownloadPeriodDays, to: roundedDays } },
-  });
-
-  revalidatePath("/tacho");
-}
-
 export type UploadState = { error?: string; success?: boolean } | undefined;
 
 export async function uploadTachoFile(_prevState: UploadState, formData: FormData): Promise<UploadState> {

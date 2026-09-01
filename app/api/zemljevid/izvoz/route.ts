@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { vehicleWhereForUser } from "@/lib/vehicle-access";
-import { computeHistoryRows, endOfDay } from "@/lib/history-data";
+import { computeHistoryRowsWithFallback, endOfDay } from "@/lib/history-data";
 
 function formatFieldLabel(key: string): string {
   const spaced = key.replace(/([A-Z])/g, " $1");
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
   });
   if (!vehicle) return NextResponse.json({ error: "Vozilo ni na voljo." }, { status: 404 });
 
-  const rows = await computeHistoryRows(vehicle, new Date(fromParam), endOfDay(toParam));
+  const rows = await computeHistoryRowsWithFallback(vehicle, new Date(fromParam), endOfDay(toParam));
 
   const keys = new Set<string>();
   for (const row of rows) {

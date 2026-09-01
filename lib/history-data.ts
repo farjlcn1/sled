@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { getTraccarRoute } from "@/lib/traccar";
+import { getTraccarPositions, getTraccarRoute } from "@/lib/traccar";
 import { applyPrivacyRedaction } from "@/lib/privacy";
 import { reverseGeocodeKey, reverseGeocodeMany } from "@/lib/photon";
 
@@ -38,6 +38,31 @@ export async function computeHistoryRows(
     speed: Math.round(p.speed * 1.852 * 10) / 10,
     course: p.course,
   }));
+}
+
+// Kadar za izbrano obdobje ni nobene pozicije (naprava je bila tiho dlje kot izbrano obdobje),
+// namesto prazne tabele poiščemo zadnjih 10 dejansko znanih pozicij, ne glede na njihovo starost
+// -- sidrano na dejanski čas zadnje pozicije (last.fixTime), NE na "zdaj", iz istega razloga kot
+// v app/api/vozila/[id]/status/route.ts: naprava, ki že dlje molči, sicer ne bi pokazala ničesar.
+// Samo za prikaz/izvoz na zemljevidu -- lib/potni-nalog.ts mora ostati vezan natanko na izbrano
+// obdobje potovanja, zato kliče computeHistoryRows neposredno, ne tega ovoja.
+const FALLBACK_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
+
+export async function computeHistoryRowsWithFallback(
+  vehicle: HistoryVehicleInput,
+  fromDate: Date,
+  toDate: Date
+): Promise<HistoryRow[]> {
+  const rows = await computeHistoryRows(vehicle, fromDate, toDate);
+  if (rows.length > 0 || !vehicle.device?.traccarDeviceId) return rows;
+
+  const [last] = await getTraccarPositions([vehicle.device.traccarDeviceId]);
+  if (!last) return rows;
+
+  const anchor = new Date(new Date(last.fixTime).getTime() + 1000);
+  const windowStart = new Date(anchor.getTime() - FALLBACK_LOOKBACK_MS);
+  const fallbackRows = await computeHistoryRows(vehicle, windowStart, anchor);
+  return fallbackRows.slice(-10);
 }
 
 // Dodaten korak, ne del computeHistoryRows samega -- klicatelji kot potni-nalog.ts (samo prva/

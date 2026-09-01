@@ -65,8 +65,11 @@ export async function deleteTraccarDevice(traccarDeviceId: number): Promise<void
   }
 }
 
+// all=true je nujen -- Traccar brez njega (tudi administratorju) vrne samo naprave z izrecno
+// pravico (tc_user_device), avtomatsko registrirane neznane naprave (glej lib/device-sync.ts) pa
+// nimajo take pravice na nikogar, zato bi brez tega parametra ostale nevidne.
 export async function getTraccarDevices(): Promise<TraccarDevice[]> {
-  const res = await traccarFetch("/api/devices");
+  const res = await traccarFetch("/api/devices?all=true");
   if (!res.ok) throw new Error(`Traccar: napaka pri branju naprav (${res.status})`);
   return res.json();
 }

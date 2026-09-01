@@ -1,6 +1,7 @@
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
+import { syncNewDevicesFromTraccar } from "@/lib/device-sync";
 import { AddDeviceForm } from "./add-device-form";
 import { ImportDevicesForm } from "./import-devices-form";
 import { DevicesTable, type DeviceRow } from "./devices-table";
@@ -28,6 +29,14 @@ export default async function NapravePage({
 }) {
   await requirePlatformAdmin();
   const filters = await searchParams;
+
+  // Najprej zrcali morebitne na novo zaznane Traccar naprave v našo tabelo (glej lib/device-sync)
+  // -- best-effort, da začasno nedosegljiv Traccar ne podre cele strani.
+  try {
+    await syncNewDevicesFromTraccar();
+  } catch (err) {
+    console.error("Sinhronizacija naprav iz Traccarja ni uspela:", err);
+  }
 
   const where: Prisma.DeviceWhereInput = {};
   if (filters.imei) where.imei = { contains: filters.imei, mode: "insensitive" };

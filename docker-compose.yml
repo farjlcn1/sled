@@ -28,6 +28,10 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres:5432/traccar
       DATABASE_USER: sledenje
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      # Ob prvi povezavi še neznane IMEI naprave jo Traccar sam vpiše v svoj seznam naprav
+      # (namesto da bi povezavo zavrnil) -- naša app/(app)/admin/naprave stran nato take naprave
+      # zazna prek getTraccarDevices() in jih zrcali v lastno tabelo (glej lib/device-sync.ts).
+      DATABASE_REGISTER_UNKNOWN: "true"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/api/health"]
       interval: 2m

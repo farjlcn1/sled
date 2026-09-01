@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
-import { updateVehicle } from "./actions";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { updateVehicle, archiveVehicle } from "./actions";
 import { SlovenianDateInput } from "@/components/date-input";
 
 const ICON_OPTIONS: { value: string; label: string }[] = [
@@ -52,10 +52,24 @@ export function EditVehicleForm({
 }) {
   const boundUpdate = updateVehicle.bind(null, vehicle.id);
   const [state, formAction, pending] = useActionState(boundUpdate, undefined);
+  const [archiving, startArchiving] = useTransition();
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (state?.success) onClose();
   }, [state, onClose]);
+
+  function handleArchive() {
+    const ok = confirm(
+      `Arhiviraj vozilo ${vehicle.plate}? Sledilna naprava bo odvezana, vozilo pa bo od zdaj vidno samo še pod skupino "Arhiv" na zemljevidu.`
+    );
+    if (!ok) return;
+    startArchiving(async () => {
+      const result = await archiveVehicle(vehicle.id);
+      if (result?.error) setArchiveError(result.error);
+      else onClose();
+    });
+  }
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/30" onClick={onClose}>
@@ -146,23 +160,35 @@ export function EditVehicleForm({
           </label>
         </div>
 
-        {state?.error && <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p>}
+        {(state?.error || archiveError) && (
+          <p className="text-sm text-red-600 dark:text-red-400">{state?.error ?? archiveError}</p>
+        )}
 
-        <div className="flex justify-end gap-2">
+        <div className="flex items-center justify-between gap-2">
           <button
             type="button"
-            onClick={onClose}
-            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+            onClick={handleArchive}
+            disabled={archiving || pending}
+            className="rounded-md border border-amber-300 px-3 py-1.5 text-sm text-amber-700 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950"
           >
-            Prekliči
+            {archiving ? "Arhiviram …" : "Arhiviraj"}
           </button>
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {pending ? "Shranjujem …" : "Shrani"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+            >
+              Prekliči
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {pending ? "Shranjujem …" : "Shrani"}
+            </button>
+          </div>
         </div>
       </form>
     </div>

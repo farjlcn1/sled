@@ -87,19 +87,21 @@ function tabClass(active: boolean) {
 
 export function VehiclesPanel({
   vehicles,
+  archivedVehicles,
   groups,
   selectedVehicleIds = [],
   selections,
   initialVisibleFields,
 }: {
   vehicles: VehicleListItem[];
+  archivedVehicles: VehicleListItem[];
   groups: GroupItem[];
   selectedVehicleIds?: string[];
   selections: SelectionData[];
   initialVisibleFields: string[];
 }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"vozila" | "skupine">("vozila");
+  const [activeTab, setActiveTab] = useState<"vozila" | "skupine" | "arhiv">("vozila");
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set());
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
@@ -331,7 +333,7 @@ export function VehiclesPanel({
     })
     .filter((path) => path.length > 0);
 
-  const vehiclesById = new Map(vehicles.map((v) => [v.id, v]));
+  const vehiclesById = new Map([...vehicles, ...archivedVehicles].map((v) => [v.id, v]));
   const focusedVehicle = focusedVehicleId ? (vehiclesById.get(focusedVehicleId) ?? null) : null;
 
   // Koliko tabel zgodovine je trenutno dejansko prikazanih (brez tistih z napako) -- vsaka od
@@ -355,6 +357,9 @@ export function VehiclesPanel({
             </button>
             <button type="button" onClick={() => setActiveTab("skupine")} className={tabClass(activeTab === "skupine")}>
               Skupine
+            </button>
+            <button type="button" onClick={() => setActiveTab("arhiv")} className={tabClass(activeTab === "arhiv")}>
+              Arhiv
             </button>
           </div>
 
@@ -428,7 +433,7 @@ export function VehiclesPanel({
                   )}
                 </tbody>
               </table>
-            ) : (
+            ) : activeTab === "skupine" ? (
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {groups.map((g) => {
@@ -482,6 +487,38 @@ export function VehiclesPanel({
                     <tr>
                       <td colSpan={2} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                         Ni še skupin.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {archivedVehicles.map((v) => (
+                    <VehicleRow
+                      key={v.id}
+                      vehicleId={v.id}
+                      plate={v.plate}
+                      brandModel={v.brandModel}
+                      driverName={v.driverName}
+                      year={v.year}
+                      registrationDate={v.registrationDate}
+                      nextServiceDate={v.nextServiceDate}
+                      note={v.note}
+                      deviceId={v.deviceId}
+                      icon={v.icon}
+                      isSelected={selectedVehicleIds.includes(v.id)}
+                      checked={checkedIds.has(v.id)}
+                      onToggleChecked={() => toggleChecked(v.id)}
+                      onContextMenu={(vehicleId, x, y) => setContextMenu({ target: { type: "vehicle", vehicleId }, x, y })}
+                      onLoadHistory={(vehicleId, label) => openHistoryDialogForIds([vehicleId], label)}
+                    />
+                  ))}
+                  {archivedVehicles.length === 0 && (
+                    <tr>
+                      <td colSpan={2} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                        Ni arhiviranih vozil.
                       </td>
                     </tr>
                   )}

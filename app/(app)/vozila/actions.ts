@@ -200,6 +200,56 @@ export async function updateVehicle(
   return { success: true };
 }
 
+export type ArchiveVehicleState = { error?: string; success?: boolean } | undefined;
+
+// Odveže sledilno napravo od vozila in vozilo doda v arhivsko skupino tega najemnika (glej
+// isArchiveGroup na VehicleGroup) -- uporablja se, ko se naprava fizično demontira, podatki
+// vozila pa morajo ostati dosegljivi (samo pod zavihkom "Arhiv" na zemljevidu, ne več med
+// aktivnimi vozili). Idempotentno -- ponoven klic na že arhiviranem vozilu ne vrne napake.
+export async function archiveVehicle(vehicleId: string): Promise<ArchiveVehicleState> {
+  const user = await requireUser();
+  if (!user.canManageVehicles && !user.canManagePlatform) {
+    return { error: "Nimaš dovoljenja za arhiviranje vozil." };
+  }
+
+  const existing = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+  if (!existing) return { error: "Vozilo ne obstaja." };
+  if (!user.canManagePlatform && existing.tenantId !== user.tenantId) {
+    return { error: "Ni dovoljeno." };
+  }
+
+  const archiveGroup = await prisma.vehicleGroup.findFirst({
+    where: { tenantId: existing.tenantId, isArchiveGroup: true },
+  });
+  if (!archiveGroup) return { error: "Podjetje nima arhivske skupine — obrni se na administratorja." };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({ where: { id: vehicleId }, data: { deviceId: null } });
+    const membership = await tx.vehicleGroupMembership.findUnique({
+      where: { vehicleId_groupId: { vehicleId, groupId: archiveGroup.id } },
+    });
+    if (!membership) {
+      await tx.vehicleGroupMembership.create({ data: { vehicleId, groupId: archiveGroup.id } });
+    }
+  });
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId: existing.tenantId,
+    action: "UPDATE",
+    entityType: "Vehicle",
+    entityId: vehicleId,
+    entityLabel: existing.plate,
+    changes: { deviceId: { from: existing.deviceId, to: null }, archived: { from: false, to: true } },
+  });
+
+  revalidatePath("/vozila");
+  revalidatePath(`/vozila/${vehicleId}`);
+  revalidatePath("/zemljevid");
+  return { success: true };
+}
+
 export type DeleteVehiclesState = { error?: string; deleted?: number; failed?: string[] } | undefined;
 
 export async function deleteVehicles(vehicleIds: string[]): Promise<DeleteVehiclesState> {

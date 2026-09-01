@@ -2,7 +2,7 @@ import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { vehicleWhereForUser } from "@/lib/vehicle-access";
 import { VehiclesPanel, type SelectionData } from "./vehicles-panel";
-import { computeHistoryRows, attachAddresses, type HistoryRow } from "@/lib/history-data";
+import { computeHistoryRowsWithFallback, attachAddresses, type HistoryRow } from "@/lib/history-data";
 import { deriveVehicleStatus, type VehicleStatus } from "@/lib/vehicle-status";
 
 // Če "do" nima izrecno nastavljene ure (privzeta polnoč ob izbiri samo dneva), ga obravnavamo
@@ -35,6 +35,31 @@ export default async function ZemljevidPage({
     }),
   ]);
 
+  // Arhivska skupina (glej isArchiveGroup) loči vozila brez naprave, ki so bila namerno
+  // arhivirana (zavihek "Arhiv"), od preostalih -- ki ostanejo pod "Vozila" tudi če trenutno
+  // nimajo naprave (npr. še niso bila povezana). Sama skupina se v zavihku "Skupine" ne prikaže,
+  // ima svoj namenski zavihek.
+  const archiveGroup = groups.find((g) => g.isArchiveGroup) ?? null;
+  const archivedVehicleIds = new Set(archiveGroup?.vehicles.map((m) => m.vehicleId) ?? []);
+  const activeVehicles = vehicles.filter((v) => !archivedVehicleIds.has(v.id));
+  const archivedVehicles = vehicles.filter((v) => archivedVehicleIds.has(v.id));
+  const visibleGroups = groups.filter((g) => !g.isArchiveGroup);
+
+  function toVehicleListItem(v: (typeof vehicles)[number]) {
+    return {
+      id: v.id,
+      plate: v.plate,
+      brandModel: [v.brand, v.model].filter(Boolean).join(" ") || "—",
+      driverName: v.currentDriver?.fullName ?? null,
+      icon: v.icon,
+      year: v.year,
+      registrationDate: v.registrationDate?.toISOString() ?? null,
+      nextServiceDate: v.nextServiceDate?.toISOString() ?? null,
+      note: v.note,
+      deviceId: v.deviceId,
+    };
+  }
+
   const selectedVehicles = vehicles.filter((v) => selectedVehicleIds.includes(v.id));
 
   type Selection = {
@@ -54,7 +79,7 @@ export default async function ZemljevidPage({
         if (!vehicle.device?.traccarDeviceId) {
           return { vehicle, rows: [], error: "Vozilo nima povezane naprave.", status: "unknown" };
         }
-        const rows = await attachAddresses(await computeHistoryRows(vehicle, fromDate, toDate));
+        const rows = await attachAddresses(await computeHistoryRowsWithFallback(vehicle, fromDate, toDate));
         const lastRow = rows[rows.length - 1];
         return { vehicle, rows, error: null, status: lastRow ? deriveVehicleStatus(lastRow) : "unknown" };
       })
@@ -80,19 +105,9 @@ export default async function ZemljevidPage({
 
   return (
     <VehiclesPanel
-      vehicles={vehicles.map((v) => ({
-        id: v.id,
-        plate: v.plate,
-        brandModel: [v.brand, v.model].filter(Boolean).join(" ") || "—",
-        driverName: v.currentDriver?.fullName ?? null,
-        icon: v.icon,
-        year: v.year,
-        registrationDate: v.registrationDate?.toISOString() ?? null,
-        nextServiceDate: v.nextServiceDate?.toISOString() ?? null,
-        note: v.note,
-        deviceId: v.deviceId,
-      }))}
-      groups={groups.map((g) => ({
+      vehicles={activeVehicles.map(toVehicleListItem)}
+      archivedVehicles={archivedVehicles.map(toVehicleListItem)}
+      groups={visibleGroups.map((g) => ({
         id: g.id,
         name: g.name,
         vehicleIds: g.vehicles.map((m) => m.vehicleId),

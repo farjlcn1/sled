@@ -24,7 +24,12 @@ export async function createTenant(_prevState: TenantState, formData: FormData):
     return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
   }
 
-  const tenant = await prisma.tenant.create({ data: parsed.data });
+  // "Arhiv" je sistemska skupina -- vanjo pade vozilo, ko se z njega odveže sledilna naprava
+  // (glej archiveVehicle v app/(app)/vozila/actions.ts), zato jo mora imeti vsak najemnik od
+  // samega začetka, ne šele ob prvi arhivirani napravi.
+  const tenant = await prisma.tenant.create({
+    data: { ...parsed.data, vehicleGroups: { create: { name: "Arhiv", isArchiveGroup: true } } },
+  });
 
   await logAudit({
     userId: user.id,

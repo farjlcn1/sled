@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-import { updateVehicle } from "../actions";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { updateVehicle, archiveVehicle } from "../actions";
 import { SlovenianDateInput } from "@/components/date-input";
 
 const ICON_OPTIONS: { value: string; label: string }[] = [
@@ -41,21 +41,44 @@ function fieldClass() {
   return "mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
 }
 
-// Ista polja in isti updateVehicle action kot v (modalni) EditVehicleForm na seznamu vozil --
-// tu pa vgrajeno neposredno na stran, brez pojavnega okna, ker urejanje TA cela stran.
+// Edina implementacija polj/gumbov za urejanje vozila -- uporablja jo tako ta stran (brez onClose,
+// vgrajeno neposredno na stran) kot modalno urejanje na seznamu vozil (glej ../edit-vehicle-form.tsx,
+// ki to samo zavije v pojavno okno in poda onClose). Namerno ena skupna komponenta namesto dveh
+// ločenih -- prej sta se lahko razšli (npr. gumb, dodan samo na eni), zdaj vsaka sprememba tu velja
+// na obeh mestih (tudi na desni klik na zemljevidu -> "Vozilo" -> ta stran).
 export function EditVehicleSection({
   vehicle,
   availableDevices,
+  onClose,
 }: {
   vehicle: EditableVehicle;
   availableDevices: { id: string; imei: string; protocol: string; brand: string | null; model: string | null }[];
+  onClose?: () => void;
 }) {
   const boundUpdate = updateVehicle.bind(null, vehicle.id);
   const [state, formAction, pending] = useActionState(boundUpdate, undefined);
+  const [archiving, startArchiving] = useTransition();
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (state?.success) onClose?.();
+  }, [state, onClose]);
+
+  function handleArchive() {
+    const ok = confirm(
+      `Arhiviraj vozilo ${vehicle.plate}? Sledilna naprava bo odvezana, vozilo pa bo od zdaj vidno samo še pod skupino "Arhiv" na zemljevidu.`
+    );
+    if (!ok) return;
+    startArchiving(async () => {
+      const result = await archiveVehicle(vehicle.id);
+      if (result?.error) setArchiveError(result.error);
+      else onClose?.();
+    });
+  }
 
   return (
     <form action={formAction} className="space-y-3">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Registrska št.
           <input name="plate" defaultValue={vehicle.plate} required className={fieldClass()} />
@@ -118,7 +141,7 @@ export function EditVehicleSection({
             className={`${fieldClass()} no-spinner`}
           />
         </label>
-        <label className="col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-3">
+        <label className="col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
           Naprava (IMEI in tip)
           <select name="deviceId" defaultValue={vehicle.deviceId ?? ""} className={fieldClass()}>
             <option value="">— brez naprave —</option>
@@ -129,23 +152,44 @@ export function EditVehicleSection({
             ))}
           </select>
         </label>
-        <label className="col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-3">
+        <label className="col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
           Opomba
           <input name="note" defaultValue={vehicle.note ?? ""} className={fieldClass()} />
         </label>
       </div>
 
-      {state?.error && <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p>}
-      {state?.success && <p className="text-sm text-green-600 dark:text-green-400">Shranjeno.</p>}
+      {(state?.error || archiveError) && (
+        <p className="text-sm text-red-600 dark:text-red-400">{state?.error ?? archiveError}</p>
+      )}
+      {!onClose && state?.success && <p className="text-sm text-green-600 dark:text-green-400">Shranjeno.</p>}
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-2">
         <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          type="button"
+          onClick={handleArchive}
+          disabled={archiving || pending}
+          className="rounded-md border border-amber-300 px-3 py-1.5 text-sm text-amber-700 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950"
         >
-          {pending ? "Shranjujem …" : "Shrani"}
+          {archiving ? "Arhiviram …" : "Arhiviraj"}
         </button>
+        <div className="flex gap-2">
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+            >
+              Prekliči
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {pending ? "Shranjujem …" : "Shrani"}
+          </button>
+        </div>
       </div>
     </form>
   );

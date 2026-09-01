@@ -11,6 +11,17 @@ export type HistoryVehicleInput = {
   device: { traccarDeviceId: number | null } | null;
 };
 
+// Arhivirano vozilo nima več device povezave (glej archiveVehicle), a je bila njegova Traccar ID
+// ob arhiviranju zabeležena v archivedTraccarDeviceId prav zato, da zgodovina ostane berljiva --
+// klicatelji naj vedno gradijo HistoryVehicleInput prek te funkcije namesto z vehicle.device
+// neposredno, da ne pozabijo na ta fallback (glej zemljevid/page.tsx in api/zemljevid/izvoz).
+export function effectiveTraccarDeviceId(vehicle: {
+  device: { traccarDeviceId: number | null } | null;
+  archivedTraccarDeviceId: number | null;
+}): number | null {
+  return vehicle.device?.traccarDeviceId ?? vehicle.archivedTraccarDeviceId ?? null;
+}
+
 export async function computeHistoryRows(
   vehicle: HistoryVehicleInput,
   fromDate: Date,

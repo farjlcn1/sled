@@ -212,7 +212,7 @@ export async function archiveVehicle(vehicleId: string): Promise<ArchiveVehicleS
     return { error: "Nimaš dovoljenja za arhiviranje vozil." };
   }
 
-  const existing = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+  const existing = await prisma.vehicle.findUnique({ where: { id: vehicleId }, include: { device: true } });
   if (!existing) return { error: "Vozilo ne obstaja." };
   if (!user.canManagePlatform && existing.tenantId !== user.tenantId) {
     return { error: "Ni dovoljeno." };
@@ -223,8 +223,14 @@ export async function archiveVehicle(vehicleId: string): Promise<ArchiveVehicleS
   });
   if (!archiveGroup) return { error: "Podjetje nima arhivske skupine — obrni se na administratorja." };
 
+  // Traccar ID trenutne naprave (če obstaja) zabeležimo v archivedTraccarDeviceId PREDEN deviceId
+  // sname -- brez tega bi zgodovina pozicij postala nedosegljiva, saj computeHistoryRows zgodovino
+  // bere prek te ID, ne prek našega Device zapisa. Če vozilo nima trenutne naprave (npr. ponovno
+  // arhiviranje), obstoječo zabeleženo vrednost pustimo pri miru.
+  const archivedTraccarDeviceId = existing.device?.traccarDeviceId ?? existing.archivedTraccarDeviceId;
+
   await prisma.$transaction(async (tx) => {
-    await tx.vehicle.update({ where: { id: vehicleId }, data: { deviceId: null } });
+    await tx.vehicle.update({ where: { id: vehicleId }, data: { deviceId: null, archivedTraccarDeviceId } });
     const membership = await tx.vehicleGroupMembership.findUnique({
       where: { vehicleId_groupId: { vehicleId, groupId: archiveGroup.id } },
     });

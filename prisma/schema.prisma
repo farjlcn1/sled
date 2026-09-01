@@ -182,6 +182,12 @@ model Vehicle {
   deviceId String? @unique
   device   Device? @relation(fields: [deviceId], references: [id])
 
+  // Sidrana Traccar ID naprave, ki jo je vozilo nazadnje imelo ob arhiviranju (glej
+  // archiveVehicle) -- deviceId se ob arhiviranju sname, da se lahko naprava prosto prevzame na
+  // drugo vozilo, a zgodovina pozicij v Traccarju ostane vezana na TO Traccar ID. Brez tega bi
+  // arhivirano vozilo izgubilo dostop do lastne zgodovine, čeprav je ta v Traccarju še vedno na voljo.
+  archivedTraccarDeviceId Int?
+
   plate              String
   brand              String?
   model              String?

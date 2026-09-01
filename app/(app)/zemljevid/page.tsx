@@ -2,7 +2,7 @@ import { requireUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { vehicleWhereForUser } from "@/lib/vehicle-access";
 import { VehiclesPanel, type SelectionData } from "./vehicles-panel";
-import { computeHistoryRowsWithFallback, attachAddresses, type HistoryRow } from "@/lib/history-data";
+import { computeHistoryRowsWithFallback, effectiveTraccarDeviceId, attachAddresses, type HistoryRow } from "@/lib/history-data";
 import { deriveVehicleStatus, type VehicleStatus } from "@/lib/vehicle-status";
 
 // Če "do" nima izrecno nastavljene ure (privzeta polnoč ob izbiri samo dneva), ga obravnavamo
@@ -76,10 +76,12 @@ export default async function ZemljevidPage({
 
     selections = await Promise.all(
       selectedVehicles.map(async (vehicle): Promise<Selection> => {
-        if (!vehicle.device?.traccarDeviceId) {
+        const traccarDeviceId = effectiveTraccarDeviceId(vehicle);
+        if (!traccarDeviceId) {
           return { vehicle, rows: [], error: "Vozilo nima povezane naprave.", status: "unknown" };
         }
-        const rows = await attachAddresses(await computeHistoryRowsWithFallback(vehicle, fromDate, toDate));
+        const historyVehicle = { id: vehicle.id, device: { traccarDeviceId } };
+        const rows = await attachAddresses(await computeHistoryRowsWithFallback(historyVehicle, fromDate, toDate));
         const lastRow = rows[rows.length - 1];
         return { vehicle, rows, error: null, status: lastRow ? deriveVehicleStatus(lastRow) : "unknown" };
       })

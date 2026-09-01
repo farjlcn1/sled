@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { vehicleWhereForUser } from "@/lib/vehicle-access";
-import { computeHistoryRowsWithFallback, endOfDay } from "@/lib/history-data";
+import { computeHistoryRowsWithFallback, effectiveTraccarDeviceId, endOfDay } from "@/lib/history-data";
 
 function formatFieldLabel(key: string): string {
   const spaced = key.replace(/([A-Z])/g, " $1");
@@ -24,11 +24,17 @@ export async function GET(req: Request) {
 
   const vehicle = await prisma.vehicle.findFirst({
     where: { id: vehicleId, ...vehicleWhereForUser(user) },
-    select: { id: true, plate: true, device: { select: { traccarDeviceId: true } } },
+    select: {
+      id: true,
+      plate: true,
+      archivedTraccarDeviceId: true,
+      device: { select: { traccarDeviceId: true } },
+    },
   });
   if (!vehicle) return NextResponse.json({ error: "Vozilo ni na voljo." }, { status: 404 });
 
-  const rows = await computeHistoryRowsWithFallback(vehicle, new Date(fromParam), endOfDay(toParam));
+  const historyVehicle = { id: vehicle.id, device: { traccarDeviceId: effectiveTraccarDeviceId(vehicle) } };
+  const rows = await computeHistoryRowsWithFallback(historyVehicle, new Date(fromParam), endOfDay(toParam));
 
   const keys = new Set<string>();
   for (const row of rows) {

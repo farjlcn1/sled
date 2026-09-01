@@ -6,6 +6,7 @@ import { AssignTenantSelect } from "./assign-tenant-select";
 import { EditDeviceForm } from "./edit-device-form";
 import { PROTOCOL_OPTIONS } from "./protocol-options";
 import { SmsDevicesForm } from "./sms-devices-form";
+import { refreshDeviceInfo } from "./actions";
 
 const PROTOCOL_LABELS: Record<string, string> = Object.fromEntries(
   PROTOCOL_OPTIONS.map((o) => [o.value, o.label])
@@ -18,6 +19,8 @@ export type DeviceRow = {
   model: string | null;
   serialNumber: string | null;
   simNumber: string | null;
+  iccid: string | null;
+  traccarDeviceId: number | null;
   protocol: string;
   note: string | null;
   tenantId: string | null;
@@ -32,6 +35,7 @@ type ColumnKey =
   | "brandModel"
   | "serialNumber"
   | "simNumber"
+  | "iccid"
   | "protocol"
   | "tenant"
   | "vehicle"
@@ -43,6 +47,7 @@ const COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "brandModel", label: "Znamka/model" },
   { key: "serialNumber", label: "Serijska št." },
   { key: "simNumber", label: "SIM" },
+  { key: "iccid", label: "ICCID" },
   { key: "protocol", label: "Protokol" },
   { key: "tenant", label: "Podjetje" },
   { key: "vehicle", label: "Vozilo" },
@@ -60,6 +65,8 @@ function sortValue(d: DeviceRow, key: ColumnKey): string | number {
       return d.serialNumber ?? "";
     case "simNumber":
       return d.simNumber ?? "";
+    case "iccid":
+      return d.iccid ?? "";
     case "protocol":
       return PROTOCOL_LABELS[d.protocol] ?? d.protocol;
     case "tenant":
@@ -90,6 +97,35 @@ export function DevicesTable({
   const [checked, setChecked] = useState<Set<string>>(() => new Set());
   const [smsOpen, setSmsOpen] = useState(false);
   const [smsMessage, setSmsMessage] = useState<string | null>(null);
+  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(() => new Set());
+  const [refreshResults, setRefreshResults] = useState<Record<string, { text: string; isError: boolean }>>({});
+
+  // Ukaz napravi (getver/getimeiccid, glej lib/device-command.ts) traja do ~24s, dokler naprava ne
+  // odgovori -- stanje sledimo po napravi posebej, da lahko osvežuješ več naprav hkrati, ne da bi
+  // ena čakajoča naprava zaklenila gumbe za vse ostale vrstice.
+  async function handleRefresh(id: string) {
+    setRefreshingIds((prev) => new Set(prev).add(id));
+    setRefreshResults((prev) => {
+      const { [id]: _removed, ...rest } = prev;
+      return rest;
+    });
+
+    const result = await refreshDeviceInfo(id);
+
+    setRefreshingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+
+    if (result?.error) {
+      setRefreshResults((prev) => ({ ...prev, [id]: { text: result.error!, isError: true } }));
+    } else if (result?.success) {
+      const fieldLabels: Record<string, string> = { model: "model", iccid: "ICCID" };
+      const fields = (result.updated ?? []).map((f) => fieldLabels[f] ?? f).join(", ");
+      setRefreshResults((prev) => ({ ...prev, [id]: { text: `Posodobljeno: ${fields}.`, isError: false } }));
+    }
+  }
 
   const sortedDevices = useMemo(() => {
     if (!sort) return devices;
@@ -179,6 +215,7 @@ export function DevicesTable({
                   </td>
                   <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{d.serialNumber ?? "—"}</td>
                   <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{d.simNumber ?? "—"}</td>
+                  <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{d.iccid ?? "—"}</td>
                   <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                     {PROTOCOL_LABELS[d.protocol] ?? d.protocol}
                   </td>
@@ -202,6 +239,19 @@ export function DevicesTable({
                       </a>
                       <button
                         type="button"
+                        onClick={() => handleRefresh(d.id)}
+                        disabled={!d.traccarDeviceId || refreshingIds.has(d.id)}
+                        title={
+                          d.traccarDeviceId
+                            ? "Pošlji ukaz napravi in osveži model ter ICCID SIM kartice"
+                            : "Naprava ni registrirana v Traccarju"
+                        }
+                        className="rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                      >
+                        {refreshingIds.has(d.id) ? "Osvežujem …" : "Osveži"}
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setEditingId(d.id)}
                         className="rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                       >
@@ -209,6 +259,17 @@ export function DevicesTable({
                       </button>
                       <DeleteDeviceButton id={d.id} />
                     </div>
+                    {refreshResults[d.id] && (
+                      <p
+                        className={`mt-1 text-xs ${
+                          refreshResults[d.id].isError
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-green-600 dark:text-green-400"
+                        }`}
+                      >
+                        {refreshResults[d.id].text}
+                      </p>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -61,6 +61,10 @@ model Device {
   model          String?
   serialNumber   String?
   simNumber      String?
+  // SIM-kartice lastna serijska št. (ICCID) -- pridobljena samodejno prek getimeiccid ukaza
+  // (glej lib/device-command.ts), NAMENOMA ločena od simNumber, ki je klicna številka za pošiljanje
+  // SMS (SMS gateway); ICCID je nekaj povsem drugega in je ni mogoče uporabiti za pošiljanje SMS.
+  iccid          String?
   note           String?
   traccarDeviceId Int?          @unique
   tenantId   String?

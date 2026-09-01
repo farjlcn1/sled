@@ -11,6 +11,7 @@ export type EditableDevice = {
   model: string | null;
   serialNumber: string | null;
   simNumber: string | null;
+  iccid: string | null;
   note: string | null;
   protocol: string;
 };
@@ -58,6 +59,10 @@ export function EditDeviceForm({
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             SIM
             <input name="simNumber" defaultValue={device.simNumber ?? ""} className={fieldClass()} />
+          </label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            ICCID
+            <input name="iccid" defaultValue={device.iccid ?? ""} className={fieldClass()} />
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Protokol

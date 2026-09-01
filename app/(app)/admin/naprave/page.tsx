@@ -75,6 +75,8 @@ export default async function NapravePage({
     model: d.model,
     serialNumber: d.serialNumber,
     simNumber: d.simNumber,
+    iccid: d.iccid,
+    traccarDeviceId: d.traccarDeviceId,
     protocol: d.protocol,
     note: d.note,
     tenantId: d.tenantId,

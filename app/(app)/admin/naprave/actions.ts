@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { createTraccarDevice, deleteTraccarDevice } from "@/lib/traccar";
+import { sendCommandAndAwaitResult, parseHwModel, parseIccid } from "@/lib/device-command";
 import { parseXlsxRows, findColumn } from "@/lib/xlsx-import";
 import { logAudit } from "@/lib/audit";
 import { sendSms } from "@/lib/sms-gateway";
@@ -18,6 +19,7 @@ const deviceSchema = z.object({
   model: z.string().optional(),
   serialNumber: z.string().optional(),
   simNumber: z.string().optional(),
+  iccid: z.string().optional(),
   note: z.string().optional(),
 });
 
@@ -32,6 +34,7 @@ export async function createDevice(_prevState: DeviceState, formData: FormData):
     model: formData.get("model") || undefined,
     serialNumber: formData.get("serialNumber") || undefined,
     simNumber: formData.get("simNumber") || undefined,
+    iccid: formData.get("iccid") || undefined,
     note: formData.get("note") || undefined,
   });
   if (!parsed.success) {
@@ -60,6 +63,7 @@ export async function createDevice(_prevState: DeviceState, formData: FormData):
       model: parsed.data.model,
       serialNumber: parsed.data.serialNumber,
       simNumber: parsed.data.simNumber,
+      iccid: parsed.data.iccid,
       note: parsed.data.note,
       traccarDeviceId,
     },
@@ -73,6 +77,7 @@ const updateDeviceSchema = z.object({
   model: z.string().optional(),
   serialNumber: z.string().optional(),
   simNumber: z.string().optional(),
+  iccid: z.string().optional(),
   note: z.string().optional(),
   protocol: z.enum(["TELTONIKA", "OTHER"]),
 });
@@ -94,6 +99,7 @@ export async function updateDevice(
     model: formData.get("model") || undefined,
     serialNumber: formData.get("serialNumber") || undefined,
     simNumber: formData.get("simNumber") || undefined,
+    iccid: formData.get("iccid") || undefined,
     note: formData.get("note") || undefined,
     protocol: formData.get("protocol") || undefined,
   });
@@ -108,6 +114,7 @@ export async function updateDevice(
       model: parsed.data.model || null,
       serialNumber: parsed.data.serialNumber || null,
       simNumber: parsed.data.simNumber || null,
+      iccid: parsed.data.iccid || null,
       note: parsed.data.note || null,
       protocol: parsed.data.protocol,
     },
@@ -186,6 +193,7 @@ export async function importDevicesXlsx(_prevState: ImportDevicesState, formData
     const tenantName = findColumn(row, "Podjetje");
     const note = findColumn(row, "Opomba");
     const simNumber = findColumn(row, "SIM");
+    const iccid = findColumn(row, "ICCID");
 
     if (!imei || !/^\d{10,17}$/.test(imei)) {
       errors.push(`${rowLabel}: neveljaven ali manjkajoč IMEI.`);
@@ -217,7 +225,7 @@ export async function importDevicesXlsx(_prevState: ImportDevicesState, formData
     }
 
     await prisma.device.create({
-      data: { imei, brand, model, serialNumber, simNumber, note, tenantId, traccarDeviceId },
+      data: { imei, brand, model, serialNumber, simNumber, iccid, note, tenantId, traccarDeviceId },
     });
     created++;
   }
@@ -267,4 +275,62 @@ export async function sendDeviceSms(deviceIds: string[], message: string): Promi
   }
 
   return { sent, failed };
+}
+
+export type RefreshDeviceInfoState = { error?: string; success?: boolean; updated?: string[] } | undefined;
+
+// Pošlje "getver" in "getimeiccid" napravi prek obstoječe podatkovne povezave (ne SMS, glej
+// lib/device-command.ts) in iz odgovorov razbere model ter ICCID SIM kartice. Zaporedno, ne
+// vzporedno -- naprava obenem obravnava en ukaz, odgovora pa ni mogoče zanesljivo pripisati
+// pravemu ukazu, če bi bila oba poslana istočasno. Klicna številka SIM (simNumber) in serijska
+// št. naprave ostajata ročna polja -- teh dveh ni mogoče prebrati iz GPS/GPRS prometa.
+export async function refreshDeviceInfo(deviceId: string): Promise<RefreshDeviceInfoState> {
+  const user = await requirePlatformAdmin();
+
+  const device = await prisma.device.findUnique({ where: { id: deviceId } });
+  if (!device) return { error: "Naprava ne obstaja." };
+  if (!device.traccarDeviceId) return { error: "Naprava ni registrirana v Traccarju." };
+
+  let verText: string | null;
+  let iccidText: string | null;
+  try {
+    verText = await sendCommandAndAwaitResult(device.traccarDeviceId, "getver");
+    iccidText = await sendCommandAndAwaitResult(device.traccarDeviceId, "getimeiccid");
+  } catch {
+    return { error: "Napaka pri pošiljanju ukaza napravi." };
+  }
+
+  if (!verText && !iccidText) {
+    return { error: "Naprava ni odgovorila (morda trenutno ni povezana). Poskusi znova kasneje." };
+  }
+
+  const model = verText ? parseHwModel(verText) : null;
+  const iccid = iccidText ? parseIccid(iccidText) : null;
+
+  const data: { model?: string; iccid?: string } = {};
+  if (model) data.model = model;
+  if (iccid) data.iccid = iccid;
+
+  if (Object.keys(data).length === 0) {
+    return { error: "Naprava je odgovorila, a odgovora ni bilo mogoče razbrati." };
+  }
+
+  await prisma.device.update({ where: { id: deviceId }, data });
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId: device.tenantId,
+    action: "UPDATE",
+    entityType: "Device",
+    entityId: device.id,
+    entityLabel: device.imei,
+    changes: {
+      ...(model ? { model: { from: device.model, to: model } } : {}),
+      ...(iccid ? { iccid: { from: device.iccid, to: iccid } } : {}),
+    },
+  });
+
+  revalidatePath("/admin/naprave");
+  return { success: true, updated: Object.keys(data) };
 }

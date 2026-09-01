@@ -89,6 +89,18 @@ export async function getTraccarPositions(deviceIds: number[]): Promise<TraccarP
   return results.flat();
 }
 
+// Pošlje besedilni GPRS ukaz napravi prek OBSTOJEČE podatkovne povezave (textChannel: false) --
+// NE prek SMS. Traccar temu pravi "custom" ukaz; za Teltonika naprave je to edini podprt tip
+// ukaza (glej lib/device-command.ts za konkretne ukaze getver/getimeiccid in branje odgovora).
+// Če naprava trenutno ni povezana, Traccar ukaz vrsti in ga dostavi ob naslednji povezavi.
+export async function sendTraccarCommand(traccarDeviceId: number, data: string): Promise<void> {
+  const res = await traccarFetch("/api/commands/send", {
+    method: "POST",
+    body: JSON.stringify({ id: 0, deviceId: traccarDeviceId, type: "custom", textChannel: false, attributes: { data } }),
+  });
+  if (!res.ok) throw new Error(`Traccar: napaka pri pošiljanju ukaza (${res.status})`);
+}
+
 // Polna zgodovina pozicij za izbrano vozilo v časovnem oknu — vir podatkov za poročila.
 export async function getTraccarRoute(deviceId: number, from: Date, to: Date): Promise<TraccarPosition[]> {
   const params = new URLSearchParams({

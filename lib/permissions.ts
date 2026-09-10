@@ -33,6 +33,7 @@ export const NAV_TABS: { href: string; label: string; show: (p: PermissionFlags)
   { href: "/uporabniki", label: "Uporabniki", show: (p) => p.canManageUsers },
   { href: "/admin/naprave", label: "Naprave", show: (p) => p.canManagePlatform },
   { href: "/admin/najemniki", label: "Podjetja", show: (p) => p.canManagePlatform },
+  { href: "/admin/zaracunavanje", label: "Zaračunavanje", show: (p) => p.canManagePlatform },
   { href: "/admin/paketi", label: "Paketi", show: (p) => p.canManagePlatform },
   { href: "/revizijska-sled", label: "Revizijska sled", show: (p) => p.canManagePlatform },
 ];

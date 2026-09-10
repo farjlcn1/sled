@@ -13,7 +13,7 @@ const STATUS_LABELS: Record<string, string> = {
 export type TenantRow = {
   id: string;
   name: string;
-  deviceLimit: number;
+  priceMonthlyCents: number;
   status: string;
   planIds: string[];
   planNames: string[];
@@ -23,12 +23,12 @@ export type TenantRow = {
 };
 
 type SortDir = "asc" | "desc";
-type ColumnKey = "name" | "planNames" | "deviceLimit" | "vehicleCount" | "deviceCount" | "userCount" | "status";
+type ColumnKey = "name" | "planNames" | "priceMonthlyCents" | "vehicleCount" | "deviceCount" | "userCount" | "status";
 
 const COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "name", label: "Ime" },
   { key: "planNames", label: "Paketi" },
-  { key: "deviceLimit", label: "Meja naprav" },
+  { key: "priceMonthlyCents", label: "Cena" },
   { key: "vehicleCount", label: "Vozila" },
   { key: "deviceCount", label: "Naprave" },
   { key: "userCount", label: "Uporabniki" },
@@ -41,8 +41,8 @@ function sortValue(t: TenantRow, key: ColumnKey): string | number {
       return t.name;
     case "planNames":
       return t.planNames.join(", ");
-    case "deviceLimit":
-      return t.deviceLimit;
+    case "priceMonthlyCents":
+      return t.priceMonthlyCents;
     case "vehicleCount":
       return t.vehicleCount;
     case "deviceCount":
@@ -112,7 +112,9 @@ export function TenantsTable({
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                   {t.planNames.length > 0 ? t.planNames.join(", ") : "—"}
                 </td>
-                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.deviceLimit}</td>
+                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
+                  {(t.priceMonthlyCents / 100).toFixed(2)} €/mesec
+                </td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.vehicleCount}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.deviceCount}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.userCount}</td>
@@ -146,7 +148,6 @@ export function TenantsTable({
           tenant={{
             id: editingTenant.id,
             name: editingTenant.name,
-            deviceLimit: editingTenant.deviceLimit,
             status: editingTenant.status,
             planIds: editingTenant.planIds,
           }}

@@ -5,7 +5,17 @@ export function isMailConfigured(): boolean {
   return Boolean(process.env.SMTP_HOST);
 }
 
-export async function sendMail({ to, subject, text }: { to: string; subject: string; text: string }): Promise<void> {
+export async function sendMail({
+  to,
+  subject,
+  text,
+  attachments,
+}: {
+  to: string;
+  subject: string;
+  text: string;
+  attachments?: { filename: string; content: Buffer }[];
+}): Promise<void> {
   const host = process.env.SMTP_HOST;
   if (!host) throw new Error("SMTP ni nastavljen (manjka SMTP_HOST).");
 
@@ -26,5 +36,6 @@ export async function sendMail({ to, subject, text }: { to: string; subject: str
     to,
     subject,
     text,
+    attachments,
   });
 }

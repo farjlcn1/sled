@@ -11,7 +11,6 @@ const TENANT_STATUS_VALUES = ["AKTIVEN", "NEAKTIVEN", "TEST", "V_ODPOVEDI"] as c
 
 const tenantSchema = z.object({
   name: z.string().min(1, "Vnesi ime podjetja."),
-  deviceLimit: z.coerce.number().int().min(1).max(500).default(500),
 });
 
 export type TenantState = { error?: string } | undefined;
@@ -21,7 +20,6 @@ export async function createTenant(_prevState: TenantState, formData: FormData):
 
   const parsed = tenantSchema.safeParse({
     name: formData.get("name"),
-    deviceLimit: formData.get("deviceLimit") || 500,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
@@ -31,7 +29,7 @@ export async function createTenant(_prevState: TenantState, formData: FormData):
   // (glej archiveVehicle v app/(app)/vozila/actions.ts), zato jo mora imeti vsak najemnik od
   // samega začetka, ne šele ob prvi arhivirani napravi.
   const tenant = await prisma.tenant.create({
-    data: { ...parsed.data, vehicleGroups: { create: { name: "Arhiv", isArchiveGroup: true } } },
+    data: { ...parsed.data, deviceLimit: 500, vehicleGroups: { create: { name: "Arhiv", isArchiveGroup: true } } },
   });
 
   await logAudit({
@@ -64,7 +62,6 @@ export async function updateTenant(
 
   const parsed = tenantSchema.safeParse({
     name: formData.get("name"),
-    deviceLimit: formData.get("deviceLimit") || 500,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };

@@ -92,6 +92,11 @@ model Tenant {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
+  // Naslov za samodejno pošiljanje mesečnega računa (glej autoSendInvoice) -- ročni prenos računa
+  // v zavihku Zaračunavanje je na voljo ne glede na to nastavitev.
+  billingEmail    String?
+  autoSendInvoice Boolean @default(false)
+
   users        User[]
   devices      Device[]
   vehicles     Vehicle[]
@@ -101,6 +106,7 @@ model Tenant {
   tachoFiles   TachoFile[]
   reservations VehicleReservation[]
   subscriptions Subscription[]
+  invoices      Invoice[]
 
   @@map("tenants")
 }
@@ -140,6 +146,8 @@ model Subscription {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  vehicles Vehicle[]
 
   @@unique([tenantId, planId])
   @@map("subscriptions")
@@ -221,6 +229,13 @@ model Vehicle {
 
   // Ali je vozilo vključeno v urnik prenosa tahografskih (VU) datotek — opomnik, ne samodejen prenos.
   tachoScheduleEnabled Boolean @default(false)
+
+  // Ali se to vozilo zaračunava v mesečnem obračunu (glej zavihek Zaračunavanje) -- potrebuje tudi
+  // subscriptionId (kateri od paketov PODJETJA velja zanj, saj ima podjetje lahko več paketov hkrati,
+  // npr. ločeno za osebna vozila in kamione), sicer se ob obračunu izpusti (ni cene za zaračunati).
+  billingEnabled Boolean @default(false)
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
 
   currentDriverId String?
   currentDriver   Driver? @relation("CurrentDriver", fields: [currentDriverId], references: [id])
@@ -447,6 +462,46 @@ model TachoFile {
   createdAt DateTime @default(now())
 
   @@map("tacho_files")
+}
+
+// Mesečni račun za podjetje. Vrstice (InvoiceLine) sidrajo IMEI/registrsko/paket/ceno kot navadno
+// besedilo/številko OB IZDAJI, ne kot žive tuje ključe -- naprava se lahko kasneje prestavi na
+// drugo vozilo, paket se lahko preimenuje ali podraži, vozilo se lahko izbriše, izdan račun pa mora
+// za vedno ostati enak, kot je bil izdan (SRS 21 knjigovodska listina, enako načelo kot pri PotniNalog).
+model Invoice {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Zaporedna številka znotraj podjetja, npr. "RAC-2026-0001" (glej nextInvoiceNumber, isto
+  // načelo kot nextPotniNalogNumber).
+  number      String
+  periodYear  Int
+  periodMonth Int // 1-12
+
+  totalCents Int
+  sentAt     DateTime? // null = (še) ni bil poslan po mailu, na voljo je le ročni prenos
+
+  createdAt DateTime @default(now())
+
+  lines InvoiceLine[]
+
+  @@unique([tenantId, periodYear, periodMonth])
+  @@unique([tenantId, number])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id        String  @id @default(cuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  deviceImei   String
+  vehiclePlate String
+  planName     String
+  priceCents   Int
+
+  @@map("invoice_lines")
 }
 
 model AuditLog {

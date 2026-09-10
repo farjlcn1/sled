@@ -22,13 +22,13 @@ export default async function NajemnikiPage({
   const filters = await searchParams;
 
   const where: Prisma.TenantWhereInput = {};
-  if (filters.ime) where.name = { contains: filters.ime, mode: "insensitive" };
+  if (filters.ime) where.id = filters.ime;
   if (filters.paket) where.subscriptions = { some: { planId: filters.paket, status: "ACTIVE" } };
   if ((TENANT_STATUS_VALUES as readonly string[]).includes(filters.status ?? "")) {
     where.status = filters.status as TenantStatus;
   }
 
-  const [tenants, plans] = await Promise.all([
+  const [tenants, plans, allTenantNames] = await Promise.all([
     prisma.tenant.findMany({
       where,
       orderBy: { name: "asc" },
@@ -38,12 +38,13 @@ export default async function NajemnikiPage({
       },
     }),
     prisma.subscriptionPlan.findMany({ where: { isActive: true }, orderBy: { priceMonthlyCents: "asc" }, select: { id: true, name: true } }),
+    prisma.tenant.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   const tenantRows: TenantRow[] = tenants.map((t) => ({
     id: t.id,
     name: t.name,
-    deviceLimit: t.deviceLimit,
+    priceMonthlyCents: t.subscriptions.reduce((sum, s) => sum + s.plan.priceMonthlyCents, 0),
     status: t.status,
     planIds: t.subscriptions.map((s) => s.planId),
     planNames: t.subscriptions.map((s) => s.plan.name),
@@ -62,7 +63,14 @@ export default async function NajemnikiPage({
       <form method="get" className="grid grid-cols-2 gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 sm:grid-cols-3">
         <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
           Ime
-          <input name="ime" defaultValue={filters.ime} placeholder="ime podjetja" className={`w-full ${selectClass}`} />
+          <select name="ime" defaultValue={filters.ime ?? ""} className={`w-full ${selectClass}`}>
+            <option value="">vse</option>
+            {allTenantNames.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
           Paket

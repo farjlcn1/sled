@@ -16,17 +16,6 @@ export function AddTenantForm() {
           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         />
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Meja naprav</label>
-        <input
-          name="deviceLimit"
-          type="number"
-          min={1}
-          max={500}
-          defaultValue={500}
-          className="mt-1 w-28 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        />
-      </div>
       <button
         type="submit"
         disabled={pending}

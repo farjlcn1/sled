@@ -6,7 +6,6 @@ import { updateTenant } from "./actions";
 export type EditableTenant = {
   id: string;
   name: string;
-  deviceLimit: number;
   status: string;
   planIds: string[];
 };
@@ -52,18 +51,7 @@ export function EditTenantForm({
             Ime
             <input name="name" defaultValue={tenant.name} required className={fieldClass()} />
           </label>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Meja naprav
-            <input
-              name="deviceLimit"
-              type="number"
-              min={1}
-              max={500}
-              defaultValue={tenant.deviceLimit}
-              className={`${fieldClass()} no-spinner`}
-            />
-          </label>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Status
             <select name="status" defaultValue={tenant.status} className={fieldClass()}>
               {STATUS_OPTIONS.map((o) => (

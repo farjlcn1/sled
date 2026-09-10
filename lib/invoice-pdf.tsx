@@ -39,8 +39,7 @@ const styles = StyleSheet.create({
   value: { flex: 1, fontWeight: "bold" },
   tableHeaderRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#999", paddingBottom: 4, marginBottom: 4 },
   tableRow: { flexDirection: "row", paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: "#eee" },
-  colImei: { width: 130 },
-  colPlate: { width: 90 },
+  colImei: { width: 160 },
   colPlan: { flex: 1 },
   colPrice: { width: 80, textAlign: "right" },
   tableHeaderText: { fontWeight: "bold", fontSize: 9, color: "#666", textTransform: "uppercase" },
@@ -116,6 +115,8 @@ export async function generateInvoicePdf(invoiceId: string): Promise<Buffer> {
         <View style={styles.section} wrap={false}>
           <Text style={styles.sectionTitle}>Prejemnik</Text>
           <Field label="Podjetje" value={invoice.tenant.name} />
+          {invoice.tenant.billingAddress && <Field label="Naslov" value={invoice.tenant.billingAddress} />}
+          {invoice.tenant.taxId && <Field label="Davčna št." value={invoice.tenant.taxId} />}
           {invoice.tenant.billingEmail && <Field label="E-pošta" value={invoice.tenant.billingEmail} />}
         </View>
 
@@ -123,14 +124,12 @@ export async function generateInvoicePdf(invoiceId: string): Promise<Buffer> {
           <Text style={styles.sectionTitle}>Postavke</Text>
           <View style={styles.tableHeaderRow}>
             <Text style={{ ...styles.colImei, ...styles.tableHeaderText }}>IMEI</Text>
-            <Text style={{ ...styles.colPlate, ...styles.tableHeaderText }}>Vozilo</Text>
             <Text style={{ ...styles.colPlan, ...styles.tableHeaderText }}>Paket</Text>
             <Text style={{ ...styles.colPrice, ...styles.tableHeaderText }}>Cena</Text>
           </View>
           {invoice.lines.map((line) => (
             <View key={line.id} style={styles.tableRow}>
               <Text style={styles.colImei}>{line.deviceImei}</Text>
-              <Text style={styles.colPlate}>{line.vehiclePlate}</Text>
               <Text style={styles.colPlan}>{line.planName}</Text>
               <Text style={styles.colPrice}>{money(line.priceCents)}</Text>
             </View>

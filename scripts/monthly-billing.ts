@@ -1,8 +1,9 @@
 // Mesečni obračun -- teče prek sledenje-billing.timer (glej deploy/billing/), enkrat na mesec.
-// Ustvari račun za vsako aktivno podjetje z vsaj enim zaračunljivim vozilom (glej
-// generateInvoiceForTenant) in ga -- če ima podjetje autoSendInvoice + billingEmail nastavljena --
-// takoj tudi pošlje po e-pošti. Ročni "Ustvari/prenesi" gumb v zavihku Zaračunavanje kliče isto
-// generateInvoiceForTenant funkcijo, zato je vedenje (idempotentnost, izbor vozil) povsod enako.
+// Ustvari (ali, če za to obdobje še ni bil poslan, posodobi) račun za vsako aktivno podjetje z
+// vsaj enim zaračunljivim vozilom (glej generateInvoiceForTenant) in ga -- če ima podjetje
+// autoSendInvoice + billingEmail nastavljena -- takoj tudi pošlje po e-pošti. Ročni
+// "Ustvari/prenesi" gumb v zavihku Zaračunavanje kliče isto generateInvoiceForTenant funkcijo,
+// zato je vedenje (izbor vozil, kdaj se prepiše) povsod enako.
 import "dotenv/config";
 import { prisma } from "../lib/db";
 import { generateInvoiceForTenant } from "../lib/invoice";
@@ -23,11 +24,11 @@ async function main() {
       console.log(`${tenant.name}: preskočeno -- ${result.error}`);
       continue;
     }
-    if (!result.created) {
-      console.log(`${tenant.name}: račun za to obdobje že obstaja, brez spremembe.`);
-      continue;
-    }
-    console.log(`${tenant.name}: ustvarjen račun (${result.invoiceId}).`);
+    console.log(
+      result.status === "created"
+        ? `${tenant.name}: ustvarjen račun (${result.invoiceId}).`
+        : `${tenant.name}: račun za to obdobje že obstaja, posodobljen glede na trenutno stanje vozil (${result.invoiceId}).`
+    );
 
     if (!tenant.autoSendInvoice || !tenant.billingEmail) continue;
     if (!isMailConfigured()) {

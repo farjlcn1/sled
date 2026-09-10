@@ -97,6 +97,10 @@ model Tenant {
   billingEmail    String?
   autoSendInvoice Boolean @default(false)
 
+  // Prikazano na strani "Prejemnik" izdanega računa (glej lib/invoice-pdf.tsx).
+  billingAddress String?
+  taxId          String? // davčna številka
+
   users        User[]
   devices      Device[]
   vehicles     Vehicle[]

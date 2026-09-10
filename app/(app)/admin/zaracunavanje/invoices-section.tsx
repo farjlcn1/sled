@@ -22,25 +22,20 @@ export function InvoicesSection({
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
+  // Samo ustvari/posodobi račun v spodnjem seznamu -- NE prenese ga samodejno (za to je "Prenesi"
+  // pri vsakem računu posebej), da se generiranje in prenos ne mešata v en klik.
   function handleGenerate() {
     setError(null);
+    setMessage(null);
     startTransition(async () => {
       const result = await generateCurrentInvoice(tenantId);
       if (result.error) {
         setError(result.error);
         return;
       }
-      if (result.invoiceId) {
-        // target="_blank" je tu NUJEN, ne samo priporočen -- brez njega klik poskusi navigirati
-        // TRENUTNI zavihek, kar med to (revalidatePath-proženo) React tranzicijo lahko prekine
-        // stran in pusti Next.js router v pokvarjenem stanju ("This page couldn't load").
-        const link = document.createElement("a");
-        link.href = `/api/racuni/${result.invoiceId}/pdf`;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.click();
-      }
+      setMessage("Račun ustvarjen -- prenesi ga spodaj v seznamu.");
     });
   }
 
@@ -54,9 +49,10 @@ export function InvoicesSection({
           disabled={isPending}
           className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
         >
-          {isPending ? "Pripravljam …" : `Ustvari/prenesi račun — ${currentPeriodLabel}`}
+          {isPending ? "Pripravljam …" : `Ustvari račun — ${currentPeriodLabel}`}
         </button>
         {error && <span className="text-sm text-red-600 dark:text-red-400">{error}</span>}
+        {message && <span className="text-sm text-green-600 dark:text-green-400">{message}</span>}
       </div>
 
       <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-700">

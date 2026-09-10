@@ -3,15 +3,17 @@
 import { useState, useTransition } from "react";
 import { sendCurrentInvoice } from "./actions";
 
+// Naslov(-i) se vpišejo tu, sproti, ob vsakem ročnem pošiljanju posebej -- NAMENOMA ločeno od
+// Tenant.billingEmails (privzeti naslovi podjetja v zavihku Podjetja, uporabljeni samo za mesečni
+// samodejni tek), da ročno pošiljanje ne vpliva na in ni vezano na privzeto konfiguracijo podjetja.
 export function SendInvoiceButton({
   tenantId,
-  billingEmails,
   currentPeriodLabel,
 }: {
   tenantId: string;
-  billingEmails: string[];
   currentPeriodLabel: string;
 }) {
+  const [to, setTo] = useState("");
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
@@ -19,29 +21,32 @@ export function SendInvoiceButton({
   function handleSend() {
     setMessage(null);
     startTransition(async () => {
-      const result = await sendCurrentInvoice(tenantId);
+      const result = await sendCurrentInvoice(tenantId, to);
       setIsError(Boolean(result.error));
       setMessage(result.error ?? result.success ?? null);
     });
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-md border border-gray-200 p-4 dark:border-gray-700">
+    <div className="flex flex-wrap items-end gap-3 rounded-md border border-gray-200 p-4 dark:border-gray-700">
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        Pošlji račun na e-pošto (lahko več, ločenih z vejico)
+        <input
+          type="text"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          placeholder="prejemnik@primer.si"
+          className="mt-1 w-72 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+        />
+      </label>
       <button
         type="button"
         onClick={handleSend}
-        disabled={isPending}
+        disabled={isPending || to.trim().length === 0}
         className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
-        {isPending ? "Pošiljam …" : `Pošlji račun — ${currentPeriodLabel}`}
+        {isPending ? "Pošiljam …" : `Pošlji — ${currentPeriodLabel}`}
       </button>
-      {billingEmails.length > 0 ? (
-        <span className="text-sm text-gray-500 dark:text-gray-400">Na: {billingEmails.join(", ")}</span>
-      ) : (
-        <span className="text-sm text-gray-500 dark:text-gray-400">
-          Ni nastavljenega e-poštnega naslova (uredi v zavihku Podjetja).
-        </span>
-      )}
       {message && (
         <span className={`text-sm ${isError ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
           {message}

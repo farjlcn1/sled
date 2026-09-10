@@ -70,6 +70,7 @@ export function VehiclesBillingTable({
       for (const id of checked) next[id] = { ...next[id], billingEnabled: enabled };
       return next;
     });
+    setChecked(new Set());
     setMessage(null);
   }
 

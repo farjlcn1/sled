@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePlatformAdmin } from "@/lib/auth/session";
@@ -7,6 +8,23 @@ import { diffFields, logAudit } from "@/lib/audit";
 import { generateInvoiceForTenant } from "@/lib/invoice";
 import { generateInvoicePdf } from "@/lib/invoice-pdf";
 import { sendMail, isMailConfigured } from "@/lib/mail";
+
+const emailSchema = z.string().trim().email();
+
+// Eden na vrstico (ali ločeni z vejico) -- glej isto načelo v admin/najemniki/actions.ts, tu pa gre
+// za NASLOVE, ki jih uporabnik vnese SPROTI ob ročnem pošiljanju (glej sendCurrentInvoice), ne
+// za privzete naslove podjetja.
+function parseEmailList(raw: string): string[] | { error: string } {
+  const emails = raw
+    .split(/[\n,]/)
+    .map((e) => e.trim())
+    .filter(Boolean);
+  if (emails.length === 0) return { error: "Vnesi vsaj en e-poštni naslov." };
+  for (const e of emails) {
+    if (!emailSchema.safeParse(e).success) return { error: `"${e}" ni veljaven e-poštni naslov.` };
+  }
+  return emails;
+}
 
 export type VehicleBillingEntry = { vehicleId: string; subscriptionId: string | null; billingEnabled: boolean };
 
@@ -95,17 +113,19 @@ export async function generateCurrentInvoice(tenantId: string): Promise<Generate
 
 export type SendInvoiceResult = { error?: string; success?: string };
 
-// Ročno "Pošlji" -- neodvisno od Tenant.autoSendInvoice (ta ureja samo mesečni samodejni tek, glej
-// scripts/monthly-billing.ts). Naslovi se berejo IZ PODATKOV PODJETJA (zavihek Podjetja), tu se
-// jih ne more urejati. Če je tekoči mesec že poslan, se ne poskuša znova generirati (bilo bi
-// zavrnjeno, glej generateInvoiceForTenant) -- samo znova pošlje že obstoječega.
-export async function sendCurrentInvoice(tenantId: string): Promise<SendInvoiceResult> {
+// Ročno "Pošlji" -- naslov(-i) vnese uporabnik SPROTI tu (glej to), popolnoma neodvisno od
+// Tenant.billingEmails (privzeti naslovi podjetja, uporabljeni samo za mesečni SAMODEJNI tek, glej
+// scripts/monthly-billing.ts). Če je tekoči mesec že poslan, se ne poskuša znova generirati (bilo
+// bi zavrnjeno, glej generateInvoiceForTenant) -- samo znova pošlje že obstoječega.
+export async function sendCurrentInvoice(tenantId: string, to: string): Promise<SendInvoiceResult> {
   const user = await requirePlatformAdmin();
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant) return { error: "Podjetje ne obstaja." };
-  if (tenant.billingEmails.length === 0) {
-    return { error: "Za to podjetje ni nastavljenega e-poštnega naslova (uredi v zavihku Podjetja)." };
-  }
+
+  const recipientsResult = parseEmailList(to);
+  if ("error" in recipientsResult) return { error: recipientsResult.error };
+  const recipients = recipientsResult;
+
   if (!isMailConfigured()) return { error: "SMTP ni nastavljen." };
 
   const now = new Date();
@@ -127,7 +147,7 @@ export async function sendCurrentInvoice(tenantId: string): Promise<SendInvoiceR
   const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId }, select: { number: true } });
   const pdf = await generateInvoicePdf(invoiceId);
   await sendMail({
-    to: tenant.billingEmails.join(", "),
+    to: recipients.join(", "),
     subject: `Račun ${invoice.number} -- ${tenant.name}`,
     text: "V prilogi je mesečni račun za storitev sledenja vozil.",
     attachments: [{ filename: `racun-${invoice.number}.pdf`, content: pdf }],
@@ -141,9 +161,9 @@ export async function sendCurrentInvoice(tenantId: string): Promise<SendInvoiceR
     action: "UPDATE",
     entityType: "Invoice",
     entityId: invoiceId,
-    entityLabel: `Račun poslan na ${tenant.billingEmails.join(", ")}`,
+    entityLabel: `Račun ročno poslan na ${recipients.join(", ")}`,
   });
 
   revalidatePath("/admin/zaracunavanje");
-  return { success: `Poslano na: ${tenant.billingEmails.join(", ")}` };
+  return { success: `Poslano na: ${recipients.join(", ")}` };
 }

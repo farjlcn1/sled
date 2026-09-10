@@ -6,6 +6,7 @@ import {
   computeFuelReport,
   computeSpeedReport,
   computeEcoReport,
+  computeDelovneUreReport,
   computeAllDataRows,
   collectDataKeys,
   type ReportType,
@@ -178,6 +179,26 @@ function EkoSection({
   );
 }
 
+function DelovneUreSection({ report }: { report: VehicleReportResult & { ok: true } }) {
+  const delovneUre = computeDelovneUreReport(report.positions);
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Tile label="Delovne ure" value={`${(delovneUre.workingMin / 60).toFixed(1)} h`} />
+        <Tile label="Premeščanje (brez potrjenega dela)" value={`${(delovneUre.transportedMin / 60).toFixed(1)} h`} />
+        <Tile label="Zaznanih intervalov aktivnosti" value={String(delovneUre.intervalsEvaluated)} />
+      </div>
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        Delo zaznavamo iz pospeškometra (spremembe na oseh X/Y/Z med 3 zaporednimi poslanimi pozicijami) ali
+        spremembe stanja "moving" — to zazna mehansko aktivnost stroja tudi, ko GPS ne kaže vožnje (npr. kopanje na
+        mestu). Da se taka aktivnost šteje kot dejansko delo (ne premeščanje na prevoznem vozilu), mora biti hkrati
+        DIN1 (kontakt) na 1 — če ni, se čas všteje pod "Premeščanje". Potrebuje napravo, ki dejansko pošilja
+        podatke o pospešku in DIN1 — če jih vozilo ne pošilja, bo poročilo prikazalo same ničle.
+      </p>
+    </>
+  );
+}
+
 function VseSection({ report }: { report: VehicleReportResult & { ok: true } }) {
   const rows = computeAllDataRows(report.positions);
   const keys = collectDataKeys(rows);
@@ -213,6 +234,8 @@ function VehicleReportSection({
         <HitrostSection report={report} />
       ) : type === "eko" ? (
         <EkoSection report={report} fuelTankVolumeL={fuelTankVolumeL} />
+      ) : type === "delovne-ure" ? (
+        <DelovneUreSection report={report} />
       ) : type === "vse" ? (
         <VseSection report={report} />
       ) : (
@@ -230,7 +253,7 @@ export default async function PorocilaPage({
   const user = await requirePermission("canViewReports");
   const { vehicleId, groupId, tip, from, to } = await searchParams;
   const reportType: ReportType = (
-    ["voznje", "postanki", "gorivo", "hitrost", "eko", "vse"] as const
+    ["voznje", "postanki", "gorivo", "hitrost", "eko", "delovne-ure", "vse"] as const
   ).includes(tip as ReportType)
     ? (tip as ReportType)
     : "voznje";

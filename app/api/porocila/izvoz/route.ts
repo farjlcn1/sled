@@ -8,6 +8,7 @@ import {
   computeFuelReport,
   computeSpeedReport,
   computeEcoReport,
+  computeDelovneUreReport,
   computeAllDataRows,
   collectDataKeys,
   type ReportType,
@@ -125,6 +126,24 @@ function addEkoSheet(sheet: ExcelJS.Worksheet, report: VehicleReportResult & { o
   ]);
 }
 
+function addDelovneUreSheet(sheet: ExcelJS.Worksheet, report: VehicleReportResult & { ok: true }) {
+  const delovneUre = computeDelovneUreReport(report.positions);
+  sheet.addRow(["Delovne ure (h)", "Premeščanje brez potrjenega dela (h)", "Zaznanih intervalov aktivnosti"]).font = {
+    bold: true,
+  };
+  sheet.addRow([
+    Number((delovneUre.workingMin / 60).toFixed(1)),
+    Number((delovneUre.transportedMin / 60).toFixed(1)),
+    delovneUre.intervalsEvaluated,
+  ]);
+  sheet.addRow([]);
+  sheet.addRow([
+    "Opomba: delo je zaznano iz sprememb pospeškometra (osi X/Y/Z) ali stanja \"moving\" med 3 zaporednimi " +
+      "pozicijami, potrjeno z DIN1 (kontakt) = 1. Če DIN1 ni aktiven, se zaznana aktivnost šteje kot premeščanje " +
+      "(npr. na prevoznem vozilu), ne kot delo. Brez naprave, ki dejansko pošilja te podatke, poročilo prikaže ničle.",
+  ]);
+}
+
 function addVseSheet(sheet: ExcelJS.Worksheet, report: VehicleReportResult & { ok: true }) {
   const rows = computeAllDataRows(report.positions);
   const keys = collectDataKeys(rows);
@@ -170,6 +189,9 @@ function addVehicleSheet(
     case "eko":
       addEkoSheet(sheet, report, fuelTankVolumeL);
       break;
+    case "delovne-ure":
+      addDelovneUreSheet(sheet, report);
+      break;
     case "vse":
       addVseSheet(sheet, report);
       break;
@@ -182,7 +204,7 @@ function addVehicleSheet(
   });
 }
 
-const VALID_TYPES = ["voznje", "postanki", "gorivo", "hitrost", "eko", "vse"] as const;
+const VALID_TYPES = ["voznje", "postanki", "gorivo", "hitrost", "eko", "delovne-ure", "vse"] as const;
 
 export async function GET(req: Request) {
   const user = await getSession();

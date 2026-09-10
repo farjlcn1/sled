@@ -142,6 +142,62 @@ export function computeEcoReport(
   };
 }
 
+// Delovne ure delovnega stroja (bager, traktor ...) -- GPS "vožnja" tu ni zanesljiv signal, ker
+// stroj lahko dela (koplje, dviguje) povsem na mestu. Namesto tega gledamo pospeškometer (osi
+// X/Y/Z, Teltonika AVL 17-19 -> attributes.axisX/Y/Z) -- sprememba vrednosti skozi 3 zaporedne
+// poslane pozicije pomeni mehansko aktivnost stroja. "motion" štejemo zraven kot dodaten signal
+// (npr. traktor, ki dejansko vozi med delom). To samo po sebi ne loči "stroj dela" od "stroj je
+// naložen na prikolici in se trese med vožnjo" -- zato dodatno zahtevamo DIN1 (Teltonika AVL 1 ->
+// attributes.in1): če ni true, sprememba šteje kot "premeščanje", ne kot delo.
+export type DelovneUreReport = {
+  workingMin: number;
+  transportedMin: number;
+  intervalsEvaluated: number;
+};
+
+function changedAcrossWindow(values: unknown[]): boolean {
+  if (values.some((v) => typeof v !== "number")) return false;
+  return new Set(values as number[]).size > 1;
+}
+
+export function computeDelovneUreReport(positions: TraccarPosition[]): DelovneUreReport {
+  const sorted = sortedByTime(positions);
+
+  let workingMs = 0;
+  let transportedMs = 0;
+  let intervalsEvaluated = 0;
+
+  for (let i = 2; i < sorted.length; i++) {
+    const p0 = sorted[i - 2];
+    const p1 = sorted[i - 1];
+    const p2 = sorted[i];
+
+    const gapMs = new Date(p2.fixTime).getTime() - new Date(p1.fixTime).getTime();
+    if (gapMs <= 0) continue;
+
+    const axisChanged = (["axisX", "axisY", "axisZ"] as const).some((key) =>
+      changedAcrossWindow([p0.attributes[key], p1.attributes[key], p2.attributes[key]])
+    );
+    const motionValues = [p0.attributes.motion, p1.attributes.motion, p2.attributes.motion];
+    const motionChanged = motionValues.every((v) => typeof v === "boolean") && new Set(motionValues).size > 1;
+
+    if (!axisChanged && !motionChanged) continue;
+
+    intervalsEvaluated++;
+    if (p2.attributes.in1 === true) {
+      workingMs += gapMs;
+    } else {
+      transportedMs += gapMs;
+    }
+  }
+
+  return {
+    workingMin: Math.round(workingMs / 60000),
+    transportedMin: Math.round(transportedMs / 60000),
+    intervalsEvaluated,
+  };
+}
+
 export type AllDataRow = { fixTime: string } & Record<string, unknown>;
 
 export function computeAllDataRows(positions: TraccarPosition[]): AllDataRow[] {

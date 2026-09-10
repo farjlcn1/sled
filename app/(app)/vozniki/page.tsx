@@ -18,7 +18,7 @@ export default async function VozNikiPage() {
       ? prisma.vehicle.findMany({ where: { tenantId: user.tenantId }, orderBy: { plate: "asc" }, select: { id: true, plate: true } })
       : Promise.resolve([]),
     !user.tenantId
-      ? prisma.tenant.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } })
+      ? prisma.tenant.findMany({ where: { status: "AKTIVEN" }, orderBy: { name: "asc" }, select: { id: true, name: true } })
       : Promise.resolve([]),
   ]);
 

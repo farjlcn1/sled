@@ -19,7 +19,7 @@ export default async function PotniNalogiPage({
   let tenants: { id: string; name: string }[] = [];
 
   if (isSudo) {
-    tenants = await prisma.tenant.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } });
+    tenants = await prisma.tenant.findMany({ where: { status: "AKTIVEN" }, orderBy: { name: "asc" }, select: { id: true, name: true } });
     const { podjetje } = await searchParams;
     tenantId = podjetje || undefined;
   }

@@ -77,13 +77,20 @@ model Device {
 }
 
 // Podjetje (najemnik). Meja naprav se preverja v aplikacijski logiki ob dodajanju vozila.
+enum TenantStatus {
+  AKTIVEN
+  NEAKTIVEN
+  TEST
+  V_ODPOVEDI
+}
+
 model Tenant {
-  id          String    @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
-  deviceLimit Int       @default(500)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  deviceLimit Int          @default(500)
+  status      TenantStatus @default(AKTIVEN)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   users        User[]
   devices      Device[]
@@ -93,7 +100,7 @@ model Tenant {
   potniNalogi  PotniNalog[]
   tachoFiles   TachoFile[]
   reservations VehicleReservation[]
-  subscription Subscription?
+  subscriptions Subscription[]
 
   @@map("tenants")
 }
@@ -103,12 +110,12 @@ enum SubscriptionStatus {
   CANCELED
 }
 
-// Paket naročnine — predloga (ime, cena, meja naprav). Podjetje se nanj naveže prek Subscription.
+// Paket naročnine — predloga (ime, cena). Podjetje se lahko naveže na več paketov hkrati prek
+// Subscription (npr. en paket za osebna vozila, drug za kamione, drugače opremljena).
 model SubscriptionPlan {
   id                String   @id @default(cuid())
   name              String   @unique
   priceMonthlyCents  Int
-  deviceLimit       Int
   description       String?
   isActive          Boolean  @default(true)
   createdAt         DateTime @default(now())
@@ -119,10 +126,11 @@ model SubscriptionPlan {
   @@map("subscription_plans")
 }
 
-// Trenutna naročnina podjetja — ena aktivna naročnina na podjetje.
+// Naročnina podjetja na en paket -- podjetje jih ima lahko več hkrati (glej komentar zgoraj),
+// zato tenantId ni unique; @@unique spodaj samo prepreči podvojeno naročnino na ISTI paket.
 model Subscription {
   id         String             @id @default(cuid())
-  tenantId   String             @unique
+  tenantId   String
   tenant     Tenant             @relation(fields: [tenantId], references: [id])
   planId     String
   plan       SubscriptionPlan   @relation(fields: [planId], references: [id])
@@ -133,6 +141,7 @@ model Subscription {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([tenantId, planId])
   @@map("subscriptions")
 }
 

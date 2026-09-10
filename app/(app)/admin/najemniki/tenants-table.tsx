@@ -1,41 +1,46 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AssignPlanSelect } from "./assign-plan-select";
 import { EditTenantForm } from "./edit-tenant-form";
-import { ToggleActiveButton } from "./toggle-active-button";
+
+const STATUS_LABELS: Record<string, string> = {
+  AKTIVEN: "Aktiven",
+  NEAKTIVEN: "Neaktiven",
+  TEST: "Test",
+  V_ODPOVEDI: "V odpovedi",
+};
 
 export type TenantRow = {
   id: string;
   name: string;
   deviceLimit: number;
-  isActive: boolean;
-  planId: string | null;
-  planName: string;
+  status: string;
+  planIds: string[];
+  planNames: string[];
   vehicleCount: number;
   deviceCount: number;
   userCount: number;
 };
 
 type SortDir = "asc" | "desc";
-type ColumnKey = "name" | "planName" | "deviceLimit" | "vehicleCount" | "deviceCount" | "userCount" | "isActive";
+type ColumnKey = "name" | "planNames" | "deviceLimit" | "vehicleCount" | "deviceCount" | "userCount" | "status";
 
 const COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "name", label: "Ime" },
-  { key: "planName", label: "Paket" },
+  { key: "planNames", label: "Paketi" },
   { key: "deviceLimit", label: "Meja naprav" },
   { key: "vehicleCount", label: "Vozila" },
   { key: "deviceCount", label: "Naprave" },
   { key: "userCount", label: "Uporabniki" },
-  { key: "isActive", label: "Status" },
+  { key: "status", label: "Status" },
 ];
 
 function sortValue(t: TenantRow, key: ColumnKey): string | number {
   switch (key) {
     case "name":
       return t.name;
-    case "planName":
-      return t.planName;
+    case "planNames":
+      return t.planNames.join(", ");
     case "deviceLimit":
       return t.deviceLimit;
     case "vehicleCount":
@@ -44,8 +49,8 @@ function sortValue(t: TenantRow, key: ColumnKey): string | number {
       return t.deviceCount;
     case "userCount":
       return t.userCount;
-    case "isActive":
-      return t.isActive ? 1 : 0;
+    case "status":
+      return STATUS_LABELS[t.status] ?? t.status;
   }
 }
 
@@ -105,26 +110,23 @@ export function TenantsTable({
               <tr key={t.id}>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.name}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
-                  <AssignPlanSelect tenantId={t.id} currentPlanId={t.planId} plans={plans} />
+                  {t.planNames.length > 0 ? t.planNames.join(", ") : "—"}
                 </td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.deviceLimit}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.vehicleCount}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.deviceCount}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.userCount}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
-                  {t.isActive ? "Aktivna" : "Neaktivna"}
+                  {STATUS_LABELS[t.status] ?? t.status}
                 </td>
                 <td className="px-4 py-2 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(t.id)}
-                      className="rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-                    >
-                      Uredi
-                    </button>
-                    <ToggleActiveButton tenantId={t.id} isActive={t.isActive} />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(t.id)}
+                    className="rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+                  >
+                    Uredi
+                  </button>
                 </td>
               </tr>
             ))}
@@ -141,7 +143,14 @@ export function TenantsTable({
 
       {editingTenant && (
         <EditTenantForm
-          tenant={{ id: editingTenant.id, name: editingTenant.name, deviceLimit: editingTenant.deviceLimit }}
+          tenant={{
+            id: editingTenant.id,
+            name: editingTenant.name,
+            deviceLimit: editingTenant.deviceLimit,
+            status: editingTenant.status,
+            planIds: editingTenant.planIds,
+          }}
+          plans={plans}
           onClose={() => setEditingId(null)}
         />
       )}

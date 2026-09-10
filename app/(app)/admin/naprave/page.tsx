@@ -65,7 +65,7 @@ export default async function NapravePage({
       orderBy: { createdAt: "desc" },
       include: { tenant: true, vehicle: true },
     }),
-    prisma.tenant.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.tenant.findMany({ where: { status: "AKTIVEN" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   const deviceRows: DeviceRow[] = devices.map((d) => ({

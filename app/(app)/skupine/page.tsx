@@ -11,7 +11,9 @@ async function loadTenantData(tenantId: string) {
       select: { id: true, plate: true },
     }),
     prisma.vehicleGroup.findMany({
-      where: { tenantId },
+      // isArchiveGroup izključen -- pripadnost tej skupini se ureja samo prek "Arhiviraj" na
+      // vozilu (glej archiveVehicle v ../vozila/actions.ts), ne prek te splošne matrike.
+      where: { tenantId, isArchiveGroup: false },
       orderBy: { name: "asc" },
       include: { vehicles: { select: { vehicleId: true } } },
     }),
@@ -34,7 +36,7 @@ export default async function SkupinePage({
 
   if (isPlatformAdmin) {
     tenants = await prisma.tenant.findMany({
-      where: { isActive: true },
+      where: { status: "AKTIVEN" },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     });

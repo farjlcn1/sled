@@ -231,7 +231,7 @@ export async function importDriversXlsx(_prevState: ImportDriversState, formData
   }
   if (rows.length === 0) return { error: "Datoteka ne vsebuje podatkov." };
 
-  const tenants = await prisma.tenant.findMany({ where: { isActive: true }, select: { id: true, name: true } });
+  const tenants = await prisma.tenant.findMany({ where: { status: "AKTIVEN" }, select: { id: true, name: true } });
   const tenantIdByName = new Map(tenants.map((t) => [t.name.toLowerCase(), t.id]));
 
   let created = 0;

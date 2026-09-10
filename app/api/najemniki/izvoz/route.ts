@@ -3,6 +3,13 @@ import ExcelJS from "exceljs";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 
+const STATUS_LABELS: Record<string, string> = {
+  AKTIVEN: "Aktiven",
+  NEAKTIVEN: "Neaktiven",
+  TEST: "Test",
+  V_ODPOVEDI: "V odpovedi",
+};
+
 export async function GET() {
   await requirePlatformAdmin();
 
@@ -10,26 +17,26 @@ export async function GET() {
     orderBy: { name: "asc" },
     include: {
       _count: { select: { vehicles: true, devices: true, users: true } },
-      subscription: { include: { plan: true } },
+      subscriptions: { where: { status: "ACTIVE" }, include: { plan: true } },
     },
   });
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Podjetja");
 
-  sheet.addRow(["Ime", "Paket", "Meja naprav", "Št. vozil", "Št. naprav", "Št. uporabnikov", "Status"]).font = {
+  sheet.addRow(["Ime", "Paketi", "Meja naprav", "Št. vozil", "Št. naprav", "Št. uporabnikov", "Status"]).font = {
     bold: true,
   };
   for (const t of tenants) {
-    const planName = t.subscription?.status === "ACTIVE" ? t.subscription.plan.name : "";
+    const planNames = t.subscriptions.map((s) => s.plan.name).join(", ");
     sheet.addRow([
       t.name,
-      planName,
+      planNames,
       t.deviceLimit,
       t._count.vehicles,
       t._count.devices,
       t._count.users,
-      t.isActive ? "Aktivna" : "Neaktivna",
+      STATUS_LABELS[t.status] ?? t.status,
     ]);
   }
   sheet.columns.forEach((col) => {

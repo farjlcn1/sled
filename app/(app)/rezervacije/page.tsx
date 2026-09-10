@@ -28,7 +28,7 @@ export default async function RezervacijePage({
   let tenants: { id: string; name: string }[] = [];
   if (isPlatformAdmin) {
     tenants = await prisma.tenant.findMany({
-      where: { isActive: true },
+      where: { status: "AKTIVEN" },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     });

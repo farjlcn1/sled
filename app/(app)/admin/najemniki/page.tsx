@@ -1,8 +1,17 @@
-import type { Prisma } from "@/generated/prisma/client";
+import type { Prisma, TenantStatus } from "@/generated/prisma/client";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { AddTenantForm } from "./add-tenant-form";
 import { TenantsTable, type TenantRow } from "./tenants-table";
+
+const TENANT_STATUS_VALUES = ["AKTIVEN", "NEAKTIVEN", "TEST", "V_ODPOVEDI"] as const;
+
+const STATUS_OPTIONS = [
+  { value: "AKTIVEN", label: "Aktiven" },
+  { value: "NEAKTIVEN", label: "Neaktiven" },
+  { value: "TEST", label: "Test" },
+  { value: "V_ODPOVEDI", label: "V odpovedi" },
+];
 
 export default async function NajemnikiPage({
   searchParams,
@@ -14,9 +23,10 @@ export default async function NajemnikiPage({
 
   const where: Prisma.TenantWhereInput = {};
   if (filters.ime) where.name = { contains: filters.ime, mode: "insensitive" };
-  if (filters.paket) where.subscription = { is: { planId: filters.paket, status: "ACTIVE" } };
-  if (filters.status === "active") where.isActive = true;
-  else if (filters.status === "inactive") where.isActive = false;
+  if (filters.paket) where.subscriptions = { some: { planId: filters.paket, status: "ACTIVE" } };
+  if ((TENANT_STATUS_VALUES as readonly string[]).includes(filters.status ?? "")) {
+    where.status = filters.status as TenantStatus;
+  }
 
   const [tenants, plans] = await Promise.all([
     prisma.tenant.findMany({
@@ -24,7 +34,7 @@ export default async function NajemnikiPage({
       orderBy: { name: "asc" },
       include: {
         _count: { select: { vehicles: true, devices: true, users: true } },
-        subscription: { include: { plan: true } },
+        subscriptions: { where: { status: "ACTIVE" }, include: { plan: true } },
       },
     }),
     prisma.subscriptionPlan.findMany({ where: { isActive: true }, orderBy: { priceMonthlyCents: "asc" }, select: { id: true, name: true } }),
@@ -34,9 +44,9 @@ export default async function NajemnikiPage({
     id: t.id,
     name: t.name,
     deviceLimit: t.deviceLimit,
-    isActive: t.isActive,
-    planId: t.subscription?.status === "ACTIVE" ? t.subscription.planId : null,
-    planName: t.subscription?.status === "ACTIVE" ? t.subscription.plan.name : "",
+    status: t.status,
+    planIds: t.subscriptions.map((s) => s.planId),
+    planNames: t.subscriptions.map((s) => s.plan.name),
     vehicleCount: t._count.vehicles,
     deviceCount: t._count.devices,
     userCount: t._count.users,
@@ -69,8 +79,11 @@ export default async function NajemnikiPage({
           Status
           <select name="status" defaultValue={filters.status ?? ""} className={`w-full ${selectClass}`}>
             <option value="">vse</option>
-            <option value="active">Aktivna</option>
-            <option value="inactive">Neaktivna</option>
+            {STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </select>
         </label>
         <div className="col-span-2 flex items-end gap-2 sm:col-span-3">

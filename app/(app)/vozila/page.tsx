@@ -15,7 +15,9 @@ async function loadTenantData(tenantId: string) {
       select: { id: true, imei: true, protocol: true, brand: true, model: true },
     }),
     prisma.vehicleGroup.findMany({
-      where: { tenantId },
+      // isArchiveGroup izključen -- ta skupina ne sme biti izbirljiva prek generičnega izbirnika
+      // skupine, doseže se je samo prek "Arhiviraj" (glej archiveVehicle v actions.ts).
+      where: { tenantId, isArchiveGroup: false },
       orderBy: { name: "asc" },
       include: { vehicles: { select: { vehicleId: true } } },
     }),
@@ -38,7 +40,7 @@ export default async function VozilaPage({
 
   if (isPlatformAdmin) {
     tenants = await prisma.tenant.findMany({
-      where: { isActive: true },
+      where: { status: "AKTIVEN" },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     });

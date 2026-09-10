@@ -7,7 +7,16 @@ export type EditableTenant = {
   id: string;
   name: string;
   deviceLimit: number;
+  status: string;
+  planIds: string[];
 };
+
+const STATUS_OPTIONS = [
+  { value: "AKTIVEN", label: "Aktiven" },
+  { value: "NEAKTIVEN", label: "Neaktiven" },
+  { value: "TEST", label: "Test" },
+  { value: "V_ODPOVEDI", label: "V odpovedi" },
+];
 
 function fieldClass() {
   return "mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
@@ -15,9 +24,11 @@ function fieldClass() {
 
 export function EditTenantForm({
   tenant,
+  plans,
   onClose,
 }: {
   tenant: EditableTenant;
+  plans: { id: string; name: string }[];
   onClose: () => void;
 }) {
   const boundUpdate = updateTenant.bind(null, tenant.id);
@@ -52,6 +63,33 @@ export function EditTenantForm({
               className={`${fieldClass()} no-spinner`}
             />
           </label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Status
+            <select name="status" defaultValue={tenant.status} className={fieldClass()}>
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div>
+          <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Paketi (lahko izbereš več hkrati)
+          </span>
+          <div className="mt-1 space-y-1 rounded-md border border-gray-300 p-2 dark:border-gray-600">
+            {plans.length === 0 && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">Ni na voljo nobenega paketa.</p>
+            )}
+            {plans.map((p) => (
+              <label key={p.id} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input type="checkbox" name="planIds" value={p.id} defaultChecked={tenant.planIds.includes(p.id)} />
+                {p.name}
+              </label>
+            ))}
+          </div>
         </div>
 
         {state?.error && <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p>}

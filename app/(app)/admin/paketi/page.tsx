@@ -21,7 +21,6 @@ export default async function PaketiPage() {
             <tr>
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Ime</th>
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Cena</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Meja naprav</th>
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Opis</th>
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Aktivnih podjetij</th>
               <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
@@ -35,7 +34,6 @@ export default async function PaketiPage() {
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                   {(p.priceMonthlyCents / 100).toFixed(2)} €/mesec
                 </td>
-                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{p.deviceLimit}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{p.description ?? "—"}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{p._count.subscriptions}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{p.isActive ? "Aktiven" : "Onemogočen"}</td>
@@ -46,7 +44,7 @@ export default async function PaketiPage() {
             ))}
             {plans.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                   Ni še paketov.
                 </td>
               </tr>

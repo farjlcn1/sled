@@ -19,7 +19,7 @@ export default async function UporabnikiPage({
 
   if (isSudo) {
     tenants = await prisma.tenant.findMany({
-      where: { isActive: true },
+      where: { status: "AKTIVEN" },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     });

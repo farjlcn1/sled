@@ -92,14 +92,17 @@ model Tenant {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  // Naslov za samodejno pošiljanje mesečnega računa (glej autoSendInvoice) -- ročni prenos računa
-  // v zavihku Zaračunavanje je na voljo ne glede na to nastavitev.
-  billingEmail    String?
-  autoSendInvoice Boolean @default(false)
-
-  // Prikazano na strani "Prejemnik" izdanega računa (glej lib/invoice-pdf.tsx).
-  billingAddress String?
-  taxId          String? // davčna številka
+  // Kontaktni in obračunski podatki podjetja -- urejeni v zavihku Podjetja (ne Zaračunavanje),
+  // od koder jih izdan račun (glej lib/invoice-pdf.tsx) in mesečni obračun (scripts/monthly-billing.ts)
+  // samo BEREJO. billingEmails je lahko več naslovov hkrati (npr. računovodstvo + lastnik) --
+  // samodejno/ročno pošiljanje računa (glej autoSendInvoice, "Pošlji" v zavihku Zaračunavanje) gre
+  // na VSE naslove v tem seznamu naenkrat.
+  billingAddress  String?
+  taxId           String? // davčna številka
+  contactPerson   String?
+  contactPhone    String?
+  billingEmails   String[] @default([])
+  autoSendInvoice Boolean  @default(false)
 
   users        User[]
   devices      Device[]

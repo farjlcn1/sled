@@ -150,11 +150,17 @@ export function VehiclesBillingTable({
                     </select>
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={e.billingEnabled}
-                      onChange={(ev) => setEntry(v.id, { billingEnabled: ev.target.checked })}
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setEntry(v.id, { billingEnabled: !e.billingEnabled })}
+                      className={
+                        e.billingEnabled
+                          ? "rounded-md bg-green-100 px-2.5 py-1 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200"
+                          : "rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                      }
+                    >
+                      {e.billingEnabled ? "Da" : "Ne"}
+                    </button>
                   </td>
                 </tr>
               );

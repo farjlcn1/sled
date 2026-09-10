@@ -117,7 +117,9 @@ export async function generateInvoicePdf(invoiceId: string): Promise<Buffer> {
           <Field label="Podjetje" value={invoice.tenant.name} />
           {invoice.tenant.billingAddress && <Field label="Naslov" value={invoice.tenant.billingAddress} />}
           {invoice.tenant.taxId && <Field label="Davčna št." value={invoice.tenant.taxId} />}
-          {invoice.tenant.billingEmail && <Field label="E-pošta" value={invoice.tenant.billingEmail} />}
+          {invoice.tenant.billingEmails.length > 0 && (
+            <Field label="E-pošta" value={invoice.tenant.billingEmails.join(", ")} />
+          )}
         </View>
 
         <View style={styles.section}>

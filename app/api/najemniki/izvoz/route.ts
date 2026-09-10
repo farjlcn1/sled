@@ -24,9 +24,20 @@ export async function GET() {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Podjetja");
 
-  sheet.addRow(["Ime", "Paketi", "Cena/mesec (€)", "Št. vozil", "Št. naprav", "Št. uporabnikov", "Status"]).font = {
-    bold: true,
-  };
+  sheet.addRow([
+    "Ime",
+    "Paketi",
+    "Cena/mesec (€)",
+    "Št. vozil",
+    "Št. naprav",
+    "Št. uporabnikov",
+    "Status",
+    "Naslov",
+    "Davčna št.",
+    "Kontaktna oseba",
+    "Telefon",
+    "E-pošta",
+  ]).font = { bold: true };
   for (const t of tenants) {
     const planNames = t.subscriptions.map((s) => s.plan.name).join(", ");
     const priceMonthly = t.subscriptions.reduce((sum, s) => sum + s.plan.priceMonthlyCents, 0) / 100;
@@ -38,6 +49,11 @@ export async function GET() {
       t._count.devices,
       t._count.users,
       STATUS_LABELS[t.status] ?? t.status,
+      t.billingAddress ?? "",
+      t.taxId ?? "",
+      t.contactPerson ?? "",
+      t.contactPhone ?? "",
+      t.billingEmails.join(", "),
     ]);
   }
   sheet.columns.forEach((col) => {

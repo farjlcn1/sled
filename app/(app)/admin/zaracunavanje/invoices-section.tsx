@@ -32,11 +32,13 @@ export function InvoicesSection({
         return;
       }
       if (result.invoiceId) {
-        // window.open() po await-u pogosto blokira zaviralnik pojavnih oken, ker se zgodi
-        // izven izvornega uporabniškega dejanja -- klik na skrit <a> namesto tega zanesljivo
-        // sproži prenos (Content-Disposition: attachment), brez novega zavihka/okna.
+        // target="_blank" je tu NUJEN, ne samo priporočen -- brez njega klik poskusi navigirati
+        // TRENUTNI zavihek, kar med to (revalidatePath-proženo) React tranzicijo lahko prekine
+        // stran in pusti Next.js router v pokvarjenem stanju ("This page couldn't load").
         const link = document.createElement("a");
         link.href = `/api/racuni/${result.invoiceId}/pdf`;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
         link.click();
       }
     });
@@ -82,6 +84,8 @@ export function InvoicesSection({
                 <td className="px-3 py-2 text-right">
                   <a
                     href={`/api/racuni/${inv.id}/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                   >
                     Prenesi

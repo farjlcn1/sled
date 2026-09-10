@@ -1,11 +1,12 @@
 "use server";
 
-import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { diffFields, logAudit } from "@/lib/audit";
 import { generateInvoiceForTenant } from "@/lib/invoice";
+import { generateInvoicePdf } from "@/lib/invoice-pdf";
+import { sendMail, isMailConfigured } from "@/lib/mail";
 
 export type VehicleBillingEntry = { vehicleId: string; subscriptionId: string | null; billingEnabled: boolean };
 
@@ -69,58 +70,6 @@ export async function saveVehicleBilling(
   return { success: true };
 }
 
-const billingSettingsSchema = z.object({
-  billingEmail: z.union([z.string().trim().email("Neveljaven e-poštni naslov."), z.literal("")]),
-  autoSendInvoice: z.boolean(),
-  billingAddress: z.string().trim().optional(),
-  taxId: z.string().trim().optional(),
-});
-
-export type BillingSettingsState = { error?: string; success?: boolean } | undefined;
-
-export async function updateTenantBillingSettings(
-  tenantId: string,
-  _prevState: BillingSettingsState,
-  formData: FormData
-): Promise<BillingSettingsState> {
-  const user = await requirePlatformAdmin();
-  const existing = await prisma.tenant.findUnique({ where: { id: tenantId } });
-  if (!existing) return { error: "Podjetje ne obstaja." };
-
-  const parsed = billingSettingsSchema.safeParse({
-    billingEmail: formData.get("billingEmail") || "",
-    autoSendInvoice: formData.get("autoSendInvoice") === "on",
-    billingAddress: formData.get("billingAddress") || undefined,
-    taxId: formData.get("taxId") || undefined,
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
-
-  const billingEmail = parsed.data.billingEmail || null;
-  if (parsed.data.autoSendInvoice && !billingEmail) {
-    return { error: "Za samodejno pošiljanje po e-pošti je potreben e-poštni naslov." };
-  }
-
-  const data = {
-    billingEmail,
-    autoSendInvoice: parsed.data.autoSendInvoice,
-    billingAddress: parsed.data.billingAddress || null,
-    taxId: parsed.data.taxId || null,
-  };
-
-  await prisma.tenant.update({ where: { id: tenantId }, data });
-  await logAudit({
-    userId: user.id,
-    userEmail: user.email,
-    action: "UPDATE",
-    entityType: "Tenant",
-    entityId: tenantId,
-    entityLabel: existing.name,
-    changes: diffFields(existing, data),
-  });
-  revalidatePath("/admin/zaracunavanje");
-  return { success: true };
-}
-
 export type GenerateInvoiceActionResult = { invoiceId?: string; error?: string };
 
 export async function generateCurrentInvoice(tenantId: string): Promise<GenerateInvoiceActionResult> {
@@ -142,4 +91,59 @@ export async function generateCurrentInvoice(tenantId: string): Promise<Generate
 
   revalidatePath("/admin/zaracunavanje");
   return { invoiceId: result.invoiceId };
+}
+
+export type SendInvoiceResult = { error?: string; success?: string };
+
+// Ročno "Pošlji" -- neodvisno od Tenant.autoSendInvoice (ta ureja samo mesečni samodejni tek, glej
+// scripts/monthly-billing.ts). Naslovi se berejo IZ PODATKOV PODJETJA (zavihek Podjetja), tu se
+// jih ne more urejati. Če je tekoči mesec že poslan, se ne poskuša znova generirati (bilo bi
+// zavrnjeno, glej generateInvoiceForTenant) -- samo znova pošlje že obstoječega.
+export async function sendCurrentInvoice(tenantId: string): Promise<SendInvoiceResult> {
+  const user = await requirePlatformAdmin();
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  if (!tenant) return { error: "Podjetje ne obstaja." };
+  if (tenant.billingEmails.length === 0) {
+    return { error: "Za to podjetje ni nastavljenega e-poštnega naslova (uredi v zavihku Podjetja)." };
+  }
+  if (!isMailConfigured()) return { error: "SMTP ni nastavljen." };
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  const result = await generateInvoiceForTenant(tenantId, year, month);
+  let invoiceId: string;
+  if ("error" in result) {
+    const existing = await prisma.invoice.findUnique({
+      where: { tenantId_periodYear_periodMonth: { tenantId, periodYear: year, periodMonth: month } },
+    });
+    if (!existing) return { error: result.error };
+    invoiceId = existing.id;
+  } else {
+    invoiceId = result.invoiceId;
+  }
+
+  const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoiceId }, select: { number: true } });
+  const pdf = await generateInvoicePdf(invoiceId);
+  await sendMail({
+    to: tenant.billingEmails.join(", "),
+    subject: `Račun ${invoice.number} -- ${tenant.name}`,
+    text: "V prilogi je mesečni račun za storitev sledenja vozil.",
+    attachments: [{ filename: `racun-${invoice.number}.pdf`, content: pdf }],
+  });
+  await prisma.invoice.update({ where: { id: invoiceId }, data: { sentAt: new Date() } });
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId,
+    action: "UPDATE",
+    entityType: "Invoice",
+    entityId: invoiceId,
+    entityLabel: `Račun poslan na ${tenant.billingEmails.join(", ")}`,
+  });
+
+  revalidatePath("/admin/zaracunavanje");
+  return { success: `Poslano na: ${tenant.billingEmails.join(", ")}` };
 }

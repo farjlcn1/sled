@@ -11,7 +11,26 @@ const TENANT_STATUS_VALUES = ["AKTIVEN", "NEAKTIVEN", "TEST", "V_ODPOVEDI"] as c
 
 const tenantSchema = z.object({
   name: z.string().min(1, "Vnesi ime podjetja."),
+  billingAddress: z.string().trim().optional(),
+  taxId: z.string().trim().optional(),
+  contactPerson: z.string().trim().optional(),
+  contactPhone: z.string().trim().optional(),
 });
+
+const emailSchema = z.string().trim().email();
+
+// Eden na vrstico (ali ločeni z vejico) -- podjetje lahko prejema račune na več naslovov hkrati
+// (npr. računovodstvo + lastnik), glej Tenant.billingEmails.
+function parseEmailList(raw: string): string[] | { error: string } {
+  const emails = raw
+    .split(/[\n,]/)
+    .map((e) => e.trim())
+    .filter(Boolean);
+  for (const e of emails) {
+    if (!emailSchema.safeParse(e).success) return { error: `"${e}" ni veljaven e-poštni naslov.` };
+  }
+  return emails;
+}
 
 export type TenantState = { error?: string } | undefined;
 
@@ -29,7 +48,7 @@ export async function createTenant(_prevState: TenantState, formData: FormData):
   // (glej archiveVehicle v app/(app)/vozila/actions.ts), zato jo mora imeti vsak najemnik od
   // samega začetka, ne šele ob prvi arhivirani napravi.
   const tenant = await prisma.tenant.create({
-    data: { ...parsed.data, deviceLimit: 500, vehicleGroups: { create: { name: "Arhiv", isArchiveGroup: true } } },
+    data: { name: parsed.data.name, deviceLimit: 500, vehicleGroups: { create: { name: "Arhiv", isArchiveGroup: true } } },
   });
 
   await logAudit({
@@ -47,9 +66,10 @@ export async function createTenant(_prevState: TenantState, formData: FormData):
 
 export type UpdateTenantState = { error?: string; success?: boolean } | undefined;
 
-// Ureja osnovne podatke + status podjetja in obenem uskladi njegove pakete (glej planIds spodaj)
-// -- podjetje ima lahko več paketov hkrati (npr. en za osebna vozila, drug za kamione), zato je to
-// zdaj množica odkljukanih paketov, ne en sam izbirnik kot prej.
+// Ureja osnovne, kontaktne in obračunske podatke podjetja (glej opombo ob teh poljih v
+// schema.prisma) in obenem uskladi njegove pakete (glej planIds spodaj) -- podjetje ima lahko več
+// paketov hkrati (npr. en za osebna vozila, drug za kamione), zato je to zdaj množica odkljukanih
+// paketov, ne en sam izbirnik kot prej.
 export async function updateTenant(
   tenantId: string,
   _prevState: UpdateTenantState,
@@ -62,9 +82,21 @@ export async function updateTenant(
 
   const parsed = tenantSchema.safeParse({
     name: formData.get("name"),
+    billingAddress: formData.get("billingAddress") || undefined,
+    taxId: formData.get("taxId") || undefined,
+    contactPerson: formData.get("contactPerson") || undefined,
+    contactPhone: formData.get("contactPhone") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
+  }
+
+  const billingEmailsResult = parseEmailList(String(formData.get("billingEmails") ?? ""));
+  if ("error" in billingEmailsResult) return { error: billingEmailsResult.error };
+
+  const autoSendInvoice = formData.get("autoSendInvoice") === "on";
+  if (autoSendInvoice && billingEmailsResult.length === 0) {
+    return { error: "Za samodejno pošiljanje po e-pošti je potreben vsaj en e-poštni naslov." };
   }
 
   const statusRaw = formData.get("status");
@@ -74,8 +106,19 @@ export async function updateTenant(
 
   const planIds = formData.getAll("planIds").map(String).filter(Boolean);
 
+  const data = {
+    name: parsed.data.name,
+    billingAddress: parsed.data.billingAddress || null,
+    taxId: parsed.data.taxId || null,
+    contactPerson: parsed.data.contactPerson || null,
+    contactPhone: parsed.data.contactPhone || null,
+    billingEmails: billingEmailsResult,
+    autoSendInvoice,
+    status,
+  };
+
   await prisma.$transaction(async (tx) => {
-    await tx.tenant.update({ where: { id: tenantId }, data: { ...parsed.data, status } });
+    await tx.tenant.update({ where: { id: tenantId }, data });
 
     const currentActive = await tx.subscription.findMany({
       where: { tenantId, status: "ACTIVE" },
@@ -109,9 +152,10 @@ export async function updateTenant(
     entityType: "Tenant",
     entityId: tenantId,
     entityLabel: existing.name,
-    changes: diffFields(existing, { ...parsed.data, status }),
+    changes: diffFields(existing, data),
   });
 
   revalidatePath("/admin/najemniki");
+  revalidatePath("/admin/zaracunavanje");
   return { success: true };
 }

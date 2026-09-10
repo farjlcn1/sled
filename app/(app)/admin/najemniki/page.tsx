@@ -16,7 +16,16 @@ const STATUS_OPTIONS = [
 export default async function NajemnikiPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ime?: string; paket?: string; status?: string }>;
+  searchParams: Promise<{
+    ime?: string;
+    paket?: string;
+    status?: string;
+    naslov?: string;
+    davcna?: string;
+    kontakt?: string;
+    telefon?: string;
+    email?: string;
+  }>;
 }) {
   await requirePlatformAdmin();
   const filters = await searchParams;
@@ -27,8 +36,12 @@ export default async function NajemnikiPage({
   if ((TENANT_STATUS_VALUES as readonly string[]).includes(filters.status ?? "")) {
     where.status = filters.status as TenantStatus;
   }
+  if (filters.naslov) where.billingAddress = { contains: filters.naslov, mode: "insensitive" };
+  if (filters.davcna) where.taxId = { contains: filters.davcna, mode: "insensitive" };
+  if (filters.kontakt) where.contactPerson = { contains: filters.kontakt, mode: "insensitive" };
+  if (filters.telefon) where.contactPhone = { contains: filters.telefon, mode: "insensitive" };
 
-  const [tenants, plans, allTenantNames] = await Promise.all([
+  const [tenantsRaw, plans, allTenantNames] = await Promise.all([
     prisma.tenant.findMany({
       where,
       orderBy: { name: "asc" },
@@ -41,6 +54,13 @@ export default async function NajemnikiPage({
     prisma.tenant.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
+  // billingEmails je seznam -- Prisma zna preverjati samo natančno ujemanje enega elementa
+  // (has/hasSome), ne delnega niza znotraj elementa, zato se to filtrira tu (majhno št. podjetij).
+  const emailNeedle = filters.email?.toLowerCase().trim();
+  const tenants = emailNeedle
+    ? tenantsRaw.filter((t) => t.billingEmails.some((e) => e.toLowerCase().includes(emailNeedle)))
+    : tenantsRaw;
+
   const tenantRows: TenantRow[] = tenants.map((t) => ({
     id: t.id,
     name: t.name,
@@ -51,6 +71,12 @@ export default async function NajemnikiPage({
     vehicleCount: t._count.vehicles,
     deviceCount: t._count.devices,
     userCount: t._count.users,
+    billingAddress: t.billingAddress,
+    taxId: t.taxId,
+    contactPerson: t.contactPerson,
+    contactPhone: t.contactPhone,
+    billingEmails: t.billingEmails,
+    autoSendInvoice: t.autoSendInvoice,
   }));
 
   const selectClass =
@@ -60,7 +86,7 @@ export default async function NajemnikiPage({
     <div className="space-y-6">
       <AddTenantForm />
 
-      <form method="get" className="grid grid-cols-2 gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 sm:grid-cols-3">
+      <form method="get" className="grid grid-cols-2 gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 sm:grid-cols-4">
         <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
           Ime
           <select name="ime" defaultValue={filters.ime ?? ""} className={`w-full ${selectClass}`}>
@@ -94,7 +120,27 @@ export default async function NajemnikiPage({
             ))}
           </select>
         </label>
-        <div className="col-span-2 flex items-end gap-2 sm:col-span-3">
+        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+          Naslov
+          <input name="naslov" defaultValue={filters.naslov ?? ""} className={`w-full ${selectClass}`} />
+        </label>
+        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+          Davčna št.
+          <input name="davcna" defaultValue={filters.davcna ?? ""} className={`w-full ${selectClass}`} />
+        </label>
+        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+          Kontaktna oseba
+          <input name="kontakt" defaultValue={filters.kontakt ?? ""} className={`w-full ${selectClass}`} />
+        </label>
+        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+          Telefon
+          <input name="telefon" defaultValue={filters.telefon ?? ""} className={`w-full ${selectClass}`} />
+        </label>
+        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+          E-pošta
+          <input name="email" defaultValue={filters.email ?? ""} className={`w-full ${selectClass}`} />
+        </label>
+        <div className="col-span-2 flex items-end gap-2 sm:col-span-4">
           <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">
             Filtriraj
           </button>

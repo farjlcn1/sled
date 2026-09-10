@@ -1,9 +1,10 @@
 // Mesečni obračun -- teče prek sledenje-billing.timer (glej deploy/billing/), enkrat na mesec.
 // Ustvari (ali, če za to obdobje še ni bil poslan, posodobi) račun za vsako aktivno podjetje z
 // vsaj enim zaračunljivim vozilom (glej generateInvoiceForTenant) in ga -- če ima podjetje
-// autoSendInvoice + billingEmail nastavljena -- takoj tudi pošlje po e-pošti. Ročni
-// "Ustvari/prenesi" gumb v zavihku Zaračunavanje kliče isto generateInvoiceForTenant funkcijo,
-// zato je vedenje (izbor vozil, kdaj se prepiše) povsod enako.
+// autoSendInvoice + vsaj en billingEmails naslov nastavljen (urejeno v zavihku Podjetja) --
+// takoj tudi pošlje na VSE te naslove naenkrat. Ročni "Ustvari/prenesi" gumb v zavihku
+// Zaračunavanje kliče isto generateInvoiceForTenant funkcijo, zato je vedenje (izbor vozil, kdaj
+// se prepiše) povsod enako.
 import "dotenv/config";
 import { prisma } from "../lib/db";
 import { generateInvoiceForTenant } from "../lib/invoice";
@@ -30,7 +31,7 @@ async function main() {
         : `${tenant.name}: račun za to obdobje že obstaja, posodobljen glede na trenutno stanje vozil (${result.invoiceId}).`
     );
 
-    if (!tenant.autoSendInvoice || !tenant.billingEmail) continue;
+    if (!tenant.autoSendInvoice || tenant.billingEmails.length === 0) continue;
     if (!isMailConfigured()) {
       console.log(`${tenant.name}: SMTP ni nastavljen, e-pošta ni bila poslana.`);
       continue;
@@ -42,13 +43,13 @@ async function main() {
     });
     const pdf = await generateInvoicePdf(result.invoiceId);
     await sendMail({
-      to: tenant.billingEmail,
+      to: tenant.billingEmails.join(", "),
       subject: `Račun ${invoice.number} -- ${tenant.name}`,
       text: "V prilogi je mesečni račun za storitev sledenja vozil.",
       attachments: [{ filename: `racun-${invoice.number}.pdf`, content: pdf }],
     });
     await prisma.invoice.update({ where: { id: result.invoiceId }, data: { sentAt: new Date() } });
-    console.log(`${tenant.name}: račun poslan na ${tenant.billingEmail}.`);
+    console.log(`${tenant.name}: račun poslan na ${tenant.billingEmails.join(", ")}.`);
   }
 
   await prisma.$disconnect();

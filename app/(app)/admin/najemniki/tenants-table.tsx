@@ -20,10 +20,28 @@ export type TenantRow = {
   vehicleCount: number;
   deviceCount: number;
   userCount: number;
+  billingAddress: string | null;
+  taxId: string | null;
+  contactPerson: string | null;
+  contactPhone: string | null;
+  billingEmails: string[];
+  autoSendInvoice: boolean;
 };
 
 type SortDir = "asc" | "desc";
-type ColumnKey = "name" | "planNames" | "priceMonthlyCents" | "vehicleCount" | "deviceCount" | "userCount" | "status";
+type ColumnKey =
+  | "name"
+  | "planNames"
+  | "priceMonthlyCents"
+  | "vehicleCount"
+  | "deviceCount"
+  | "userCount"
+  | "status"
+  | "billingAddress"
+  | "taxId"
+  | "contactPerson"
+  | "contactPhone"
+  | "billingEmails";
 
 const COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "name", label: "Ime" },
@@ -33,6 +51,11 @@ const COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "deviceCount", label: "Naprave" },
   { key: "userCount", label: "Uporabniki" },
   { key: "status", label: "Status" },
+  { key: "billingAddress", label: "Naslov" },
+  { key: "taxId", label: "Davčna št." },
+  { key: "contactPerson", label: "Kontaktna oseba" },
+  { key: "contactPhone", label: "Telefon" },
+  { key: "billingEmails", label: "E-pošta" },
 ];
 
 function sortValue(t: TenantRow, key: ColumnKey): string | number {
@@ -51,6 +74,16 @@ function sortValue(t: TenantRow, key: ColumnKey): string | number {
       return t.userCount;
     case "status":
       return STATUS_LABELS[t.status] ?? t.status;
+    case "billingAddress":
+      return t.billingAddress ?? "";
+    case "taxId":
+      return t.taxId ?? "";
+    case "contactPerson":
+      return t.contactPerson ?? "";
+    case "contactPhone":
+      return t.contactPhone ?? "";
+    case "billingEmails":
+      return t.billingEmails.join(", ");
   }
 }
 
@@ -121,6 +154,13 @@ export function TenantsTable({
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                   {STATUS_LABELS[t.status] ?? t.status}
                 </td>
+                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.billingAddress ?? "—"}</td>
+                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.taxId ?? "—"}</td>
+                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.contactPerson ?? "—"}</td>
+                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{t.contactPhone ?? "—"}</td>
+                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
+                  {t.billingEmails.length > 0 ? t.billingEmails.join(", ") : "—"}
+                </td>
                 <td className="px-4 py-2 text-right">
                   <button
                     type="button"
@@ -150,6 +190,12 @@ export function TenantsTable({
             name: editingTenant.name,
             status: editingTenant.status,
             planIds: editingTenant.planIds,
+            billingAddress: editingTenant.billingAddress,
+            taxId: editingTenant.taxId,
+            contactPerson: editingTenant.contactPerson,
+            contactPhone: editingTenant.contactPhone,
+            billingEmails: editingTenant.billingEmails,
+            autoSendInvoice: editingTenant.autoSendInvoice,
           }}
           plans={plans}
           onClose={() => setEditingId(null)}

@@ -1,7 +1,7 @@
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { invoicePeriodLabel } from "@/lib/invoice";
-import { BillingSettingsForm } from "./billing-settings-form";
+import { SendInvoiceButton } from "./send-invoice-button";
 import { VehiclesBillingTable, type BillableVehicleRow } from "./vehicles-billing-table";
 import { InvoicesSection, type InvoiceRow } from "./invoices-section";
 
@@ -16,14 +16,7 @@ export default async function ZaracunavanjePage({
   const tenants = await prisma.tenant.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
   const tenantId = podjetje || undefined;
 
-  let tenant: {
-    id: string;
-    name: string;
-    billingEmail: string | null;
-    autoSendInvoice: boolean;
-    billingAddress: string | null;
-    taxId: string | null;
-  } | null = null;
+  let tenant: { id: string; name: string; billingEmails: string[] } | null = null;
   let vehicleRows: BillableVehicleRow[] = [];
   let plans: { id: string; name: string }[] = [];
   let invoiceRows: InvoiceRow[] = [];
@@ -32,14 +25,7 @@ export default async function ZaracunavanjePage({
     const [tenantData, vehicles, subscriptions, invoices] = await Promise.all([
       prisma.tenant.findUnique({
         where: { id: tenantId },
-        select: {
-          id: true,
-          name: true,
-          billingEmail: true,
-          autoSendInvoice: true,
-          billingAddress: true,
-          taxId: true,
-        },
+        select: { id: true, name: true, billingEmails: true },
       }),
       prisma.vehicle.findMany({
         where: { tenantId },
@@ -108,7 +94,11 @@ export default async function ZaracunavanjePage({
 
       {tenant && (
         <div className="space-y-6">
-          <BillingSettingsForm tenant={tenant} />
+          <SendInvoiceButton
+            tenantId={tenant.id}
+            billingEmails={tenant.billingEmails}
+            currentPeriodLabel={currentPeriodLabel}
+          />
           <VehiclesBillingTable key={tenant.id} tenantId={tenant.id} vehicles={vehicleRows} plans={plans} />
           <InvoicesSection tenantId={tenant.id} currentPeriodLabel={currentPeriodLabel} invoices={invoiceRows} />
         </div>

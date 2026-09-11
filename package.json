@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
-    "billing:run": "tsx scripts/monthly-billing.ts"
+    "billing:run": "tsx scripts/monthly-billing.ts",
+    "private-mode:sync": "tsx scripts/private-mode-sync.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

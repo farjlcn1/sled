@@ -30,6 +30,13 @@ const FIELD_LABELS: Record<string, string> = {
   minStopDurationMin: "Min. trajanje postanka",
   minMovingSpeedKmh: "Min. hitrost vožnje",
   tachoScheduleEnabled: "Urnik tahografa",
+  din1Label: "DIN1",
+  din2Label: "DIN2",
+  din3Label: "DIN3",
+  din4Label: "DIN4",
+  din5Label: "DIN5",
+  din6Label: "DIN6",
+  privateModeDin: "Samodejni zasebni način po DIN",
 };
 
 type ParsedChanges = Record<string, { from: unknown; to: unknown }>;
@@ -152,6 +159,14 @@ export default async function VoziloDetailPage({ params }: { params: Promise<{ i
             registrationDate: vehicle.registrationDate?.toISOString() ?? null,
             nextServiceDate: vehicle.nextServiceDate?.toISOString() ?? null,
             nextServiceKm: vehicle.nextServiceKm,
+            din1Label: vehicle.din1Label,
+            din2Label: vehicle.din2Label,
+            din3Label: vehicle.din3Label,
+            din4Label: vehicle.din4Label,
+            din5Label: vehicle.din5Label,
+            din6Label: vehicle.din6Label,
+            privateModeDin: vehicle.privateModeDin,
+            isPrivateMode: vehicle.isPrivateMode,
           }}
           availableDevices={availableDevices}
         />

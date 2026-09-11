@@ -1,0 +1,10 @@
+[Unit]
+Description=Sinhronizacija zasebnega načina po DIN (sled)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=matija
+WorkingDirectory=/home/matija/farjolcn/sled
+ExecStart=/usr/bin/docker compose exec -T app npm run private-mode:sync

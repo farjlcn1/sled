@@ -69,6 +69,14 @@ export default async function VozilaPage({
     nextServiceKm: v.nextServiceKm,
     driverName: v.currentDriver?.fullName ?? null,
     groupNames: v.groupMemberships.map((m) => m.group.name),
+    din1Label: v.din1Label,
+    din2Label: v.din2Label,
+    din3Label: v.din3Label,
+    din4Label: v.din4Label,
+    din5Label: v.din5Label,
+    din6Label: v.din6Label,
+    privateModeDin: v.privateModeDin,
+    isPrivateMode: v.isPrivateMode,
   }));
 
   return (

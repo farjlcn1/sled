@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth/session";
 import { logAudit, diffFields } from "@/lib/audit";
+import { startPrivateModeForVehicle, endPrivateModeForVehicle } from "@/lib/private-mode";
 
 const stopSettingsSchema = z.object({
   minStopDurationMin: z.coerce.number().int().min(1).max(180),
@@ -25,6 +26,13 @@ const vehicleSchema = z.object({
   deviceId: z.string().optional(),
   groupId: z.string().optional(),
   tenantId: z.string().optional(),
+  din1Label: z.string().optional(),
+  din2Label: z.string().optional(),
+  din3Label: z.string().optional(),
+  din4Label: z.string().optional(),
+  din5Label: z.string().optional(),
+  din6Label: z.string().optional(),
+  privateModeDin: z.coerce.number().int().min(1).max(6).optional(),
 });
 
 export type VehicleState = { error?: string } | undefined;
@@ -150,6 +158,13 @@ export async function updateVehicle(
     nextServiceDate: formData.get("nextServiceDate") || undefined,
     nextServiceKm: formData.get("nextServiceKm") || undefined,
     deviceId: formData.get("deviceId") || undefined,
+    din1Label: formData.get("din1Label") || undefined,
+    din2Label: formData.get("din2Label") || undefined,
+    din3Label: formData.get("din3Label") || undefined,
+    din4Label: formData.get("din4Label") || undefined,
+    din5Label: formData.get("din5Label") || undefined,
+    din6Label: formData.get("din6Label") || undefined,
+    privateModeDin: formData.get("privateModeDin") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
@@ -177,6 +192,13 @@ export async function updateVehicle(
         nextServiceDate: parsed.data.nextServiceDate ? new Date(parsed.data.nextServiceDate) : null,
         nextServiceKm: parsed.data.nextServiceKm ?? null,
         deviceId: parsed.data.deviceId || null,
+        din1Label: parsed.data.din1Label || null,
+        din2Label: parsed.data.din2Label || null,
+        din3Label: parsed.data.din3Label || null,
+        din4Label: parsed.data.din4Label || null,
+        din5Label: parsed.data.din5Label || null,
+        din6Label: parsed.data.din6Label || null,
+        privateModeDin: parsed.data.privateModeDin ?? null,
       },
     });
   } catch {
@@ -388,44 +410,35 @@ export async function updateStopSettings(
   revalidatePath("/vozila");
 }
 
-// Vklopi zasebni način: zapre morebitno že odprto obdobje (za vsak slučaj) in odpre novo.
+// Vklopi zasebni način (ročno, glej tudi scripts/private-mode-sync.ts za samodejni preklop po DIN).
 export async function startPrivateMode(vehicleId: string, retentionTier: "BASIC" | "WITH_MILEAGE") {
   const user = await requireUser();
-  if (!user.tenantId) throw new Error("Ni dovoljeno.");
+  if (!user.canManageVehicles && !user.canManagePlatform) throw new Error("Ni dovoljeno.");
 
-  const vehicle = await prisma.vehicle.findFirst({ where: { id: vehicleId, tenantId: user.tenantId } });
+  const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
   if (!vehicle) throw new Error("Vozilo ne obstaja.");
+  if (!user.canManagePlatform && vehicle.tenantId !== user.tenantId) throw new Error("Ni dovoljeno.");
 
-  await prisma.$transaction([
-    prisma.vehiclePrivacyPeriod.updateMany({
-      where: { vehicleId, endedAt: null },
-      data: { endedAt: new Date() },
-    }),
-    prisma.vehiclePrivacyPeriod.create({
-      data: { vehicleId, retentionTier },
-    }),
-    prisma.vehicle.update({ where: { id: vehicleId }, data: { isPrivateMode: true } }),
-  ]);
+  await startPrivateModeForVehicle(vehicleId, retentionTier);
 
   revalidatePath("/vozila");
+  revalidatePath(`/vozila/${vehicleId}`);
+  revalidatePath("/zemljevid");
 }
 
 export async function endPrivateMode(vehicleId: string) {
   const user = await requireUser();
-  if (!user.tenantId) throw new Error("Ni dovoljeno.");
+  if (!user.canManageVehicles && !user.canManagePlatform) throw new Error("Ni dovoljeno.");
 
-  const vehicle = await prisma.vehicle.findFirst({ where: { id: vehicleId, tenantId: user.tenantId } });
+  const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
   if (!vehicle) throw new Error("Vozilo ne obstaja.");
+  if (!user.canManagePlatform && vehicle.tenantId !== user.tenantId) throw new Error("Ni dovoljeno.");
 
-  await prisma.$transaction([
-    prisma.vehiclePrivacyPeriod.updateMany({
-      where: { vehicleId, endedAt: null },
-      data: { endedAt: new Date() },
-    }),
-    prisma.vehicle.update({ where: { id: vehicleId }, data: { isPrivateMode: false } }),
-  ]);
+  await endPrivateModeForVehicle(vehicleId);
 
   revalidatePath("/vozila");
+  revalidatePath(`/vozila/${vehicleId}`);
+  revalidatePath("/zemljevid");
 }
 
 // Kateri živi podatki naj bodo prikazani v podrobnem pogledu vozila — velja za tega uporabnika,

@@ -32,6 +32,14 @@ export type VehicleRow = {
   nextServiceKm: number | null;
   driverName: string | null;
   groupNames: string[];
+  din1Label: string | null;
+  din2Label: string | null;
+  din3Label: string | null;
+  din4Label: string | null;
+  din5Label: string | null;
+  din6Label: string | null;
+  privateModeDin: number | null;
+  isPrivateMode: boolean;
 };
 
 type SortDir = "asc" | "desc";

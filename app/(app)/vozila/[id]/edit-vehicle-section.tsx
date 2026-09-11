@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { updateVehicle, archiveVehicle } from "../actions";
+import { updateVehicle, archiveVehicle, startPrivateMode, endPrivateMode } from "../actions";
 import { SlovenianDateInput } from "@/components/date-input";
 
 const ICON_OPTIONS: { value: string; label: string }[] = [
@@ -35,6 +35,14 @@ export type EditableVehicle = {
   registrationDate: string | null;
   nextServiceDate: string | null;
   nextServiceKm: number | null;
+  din1Label: string | null;
+  din2Label: string | null;
+  din3Label: string | null;
+  din4Label: string | null;
+  din5Label: string | null;
+  din6Label: string | null;
+  privateModeDin: number | null;
+  isPrivateMode: boolean;
 };
 
 function fieldClass() {
@@ -60,9 +68,30 @@ export function EditVehicleSection({
   const [archiving, startArchiving] = useTransition();
   const [archiveError, setArchiveError] = useState<string | null>(null);
 
+  // Ločeno od "Shrani" -- ima takojšen učinek (odpre/zapre VehiclePrivacyPeriod), zato deluje kot
+  // samostojno stikalo (brez name atributa, torej ga glavni submit ignorira), ne kot del
+  // shranjevanih podatkov obrazca. Optimistično stanje + povrnitev ob napaki.
+  const [isPrivate, setIsPrivate] = useState(vehicle.isPrivateMode);
+  const [privacyPending, startPrivacyTransition] = useTransition();
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
+
   useEffect(() => {
     if (state?.success) onClose?.();
   }, [state, onClose]);
+
+  function handlePrivacyToggle(next: boolean) {
+    setIsPrivate(next);
+    setPrivacyError(null);
+    startPrivacyTransition(async () => {
+      try {
+        if (next) await startPrivateMode(vehicle.id, "WITH_MILEAGE");
+        else await endPrivateMode(vehicle.id);
+      } catch (err) {
+        setIsPrivate(!next);
+        setPrivacyError(err instanceof Error ? err.message : "Napaka pri preklopu zasebnega načina.");
+      }
+    });
+  }
 
   function handleArchive() {
     const ok = confirm(
@@ -156,6 +185,69 @@ export function EditVehicleSection({
           Opomba
           <input name="note" defaultValue={vehicle.note ?? ""} className={fieldClass()} />
         </label>
+      </div>
+
+      <div className="border-t border-gray-200 pt-3 dark:border-gray-700">
+        <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          DIN priklopi (kaj je fizično priklopljeno na posamezen digitalni vhod)
+        </span>
+        <div className="mt-1 grid grid-cols-3 gap-3">
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+            DIN1
+            <input name="din1Label" defaultValue={vehicle.din1Label ?? ""} className={fieldClass()} />
+          </label>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+            DIN2
+            <input name="din2Label" defaultValue={vehicle.din2Label ?? ""} className={fieldClass()} />
+          </label>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+            DIN3
+            <input name="din3Label" defaultValue={vehicle.din3Label ?? ""} className={fieldClass()} />
+          </label>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+            DIN4
+            <input name="din4Label" defaultValue={vehicle.din4Label ?? ""} className={fieldClass()} />
+          </label>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+            DIN5
+            <input name="din5Label" defaultValue={vehicle.din5Label ?? ""} className={fieldClass()} />
+          </label>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+            DIN6
+            <input name="din6Label" defaultValue={vehicle.din6Label ?? ""} className={fieldClass()} />
+          </label>
+        </div>
+      </div>
+
+      <div className="border-t border-gray-200 pt-3 dark:border-gray-700">
+        <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">Zasebni način</span>
+        <div className="mt-1 grid grid-cols-2 gap-3">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={isPrivate}
+              disabled={privacyPending}
+              onChange={(e) => handlePrivacyToggle(e.target.checked)}
+            />
+            Trenutno v zasebnem načinu
+          </label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Samodejno vklopi po DIN
+            <select name="privateModeDin" defaultValue={vehicle.privateModeDin ?? ""} className={fieldClass()}>
+              <option value="">Brez (samo ročno)</option>
+              <option value="1">DIN1</option>
+              <option value="2">DIN2</option>
+              <option value="3">DIN3</option>
+              <option value="4">DIN4</option>
+              <option value="5">DIN5</option>
+              <option value="6">DIN6</option>
+            </select>
+          </label>
+        </div>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Če je izbran DIN, ga redna samodejna sinhronizacija upošteva kot vir resnice in lahko prepiše zgornjo ročno kljukico.
+        </p>
+        {privacyError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{privacyError}</p>}
       </div>
 
       {(state?.error || archiveError) && (

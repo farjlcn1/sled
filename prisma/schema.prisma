@@ -230,6 +230,23 @@ model Vehicle {
 
   isPrivateMode Boolean @default(false)
 
+  // Prosto besedilo za dokumentacijo, kaj je fizično priklopljeno na posamezen digitalni vhod
+  // naprave (Teltonika DIN1-DIN6, Traccar attributes.in1-in6 -- glej lib/report-types.ts za edini
+  // trenutni primer branja teh atributov) -- različna vozila lahko isti DIN uporabljajo za
+  // popolnoma različne namene.
+  din1Label String?
+  din2Label String?
+  din3Label String?
+  din4Label String?
+  din5Label String?
+  din6Label String?
+
+  // Kateri DIN (1-6) šteje kot samodejno stikalo za zasebni način (glej
+  // scripts/private-mode-sync.ts) -- null pomeni "brez", zasebni način se tedaj vklaplja/izklaplja
+  // samo ročno (glej startPrivateMode/endPrivateMode v vozila/actions.ts). Če je nastavljen, DIN
+  // postane vir resnice za TO vozilo -- ročno nastavljeno stanje lahko naslednji tek prepiše.
+  privateModeDin Int?
+
   // Nastavljivi parametri zaznavanja postankov (razdelek 8 arhitekturnega načrta).
   minStopDurationMin Int   @default(5)
   minMovingSpeedKmh  Float @default(5)

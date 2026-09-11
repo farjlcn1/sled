@@ -342,6 +342,11 @@ export function VehiclesPanel({
   // spodnjo mejo 200px) navzven ves skupaj omejen na visino zemljevida -- glej selectionsMaxHeight.
   const visibleTableCount = selections.filter((s) => !s.error).length;
 
+  // Dokler ni odkljukano še nobeno vozilo, sta prostor pod zemljevidom (tabele zgodovine) in
+  // desno od njega ("Danes" plošča) prazna -- do takrat naj zemljevid namesto svoje običajne
+  // velikosti zapolni ta prostor. Prvo odkljukano vozilo takoj vrne normalno velikost.
+  const mapMaximized = checkedIds.size === 0;
+
   return (
     <div className="space-y-6 pb-24">
       <div
@@ -599,6 +604,7 @@ export function VehiclesPanel({
           historyRoutes={historyRoutes}
           highlightPaths={highlightPaths}
           onDragSelect={handleMapDragSelect}
+          maximized={mapMaximized}
         />
 
         {focusedVehicle && <TodaySummaryPanel vehicleId={focusedVehicle.id} plate={focusedVehicle.plate} />}

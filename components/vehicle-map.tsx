@@ -143,6 +143,7 @@ export function VehicleMap({
   historyRoutes,
   highlightPaths,
   onDragSelect,
+  maximized,
 }: {
   visibleVehicleIds?: Set<string>;
   historyRoutes?: HistoryRoute[];
@@ -150,6 +151,11 @@ export function VehicleMap({
   // Shift+vlečenje po zemljevidu (glej efekt spodaj) — sporoči, katere točke katerih narisanih
   // poti so pristale znotraj izbirnega pravokotnika, da jih klicatelj lahko označi v tabeli.
   onDragSelect?: (results: { vehicleId: string; indices: number[] }[]) => void;
+  // Dokler ni izbrano nobeno vozilo (glej VehiclesPanel), naj zemljevid namesto shranjene/privzete
+  // velikosti zapolni ves razpoložljiv prostor -- height/width spodaj ostaneta nespremenjena, torej
+  // se po izklopu maximized zemljevid vrne natanko na velikost, kot je bila pred tem (privzeto ali
+  // ročno nastavljeno prek ročic).
+  maximized?: boolean;
 } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const outerRef = useRef<HTMLDivElement>(null);
@@ -606,15 +612,21 @@ export function VehicleMap({
     };
   }, []);
 
+  // maximized ignorira shranjeno height/width samo za izris -- sami vrednosti ostaneta
+  // nedotaknjeni, da ročice po izklopu maximized vrnejo natanko prejšnjo (privzeto ali ročno
+  // nastavljeno) velikost namesto da bi jo pozabile.
+  const effectiveHeight = maximized ? null : height;
+  const effectiveWidth = maximized ? null : width;
+
   return (
     <div
       ref={outerRef}
       className={`relative overflow-hidden rounded-md border border-gray-200 dark:border-gray-700 ${
-        height === null ? "h-[75vh] min-h-[520px]" : ""
-      } ${width === null ? "w-full" : ""}`}
+        effectiveHeight === null ? "h-[75vh] min-h-[520px]" : ""
+      } ${effectiveWidth === null ? "w-full" : ""}`}
       style={{
-        ...(height !== null ? { height } : undefined),
-        ...(width !== null ? { width } : undefined),
+        ...(effectiveHeight !== null ? { height: effectiveHeight } : undefined),
+        ...(effectiveWidth !== null ? { width: effectiveWidth } : undefined),
         minHeight: 320,
         minWidth: 320,
         maxWidth: "100%",
@@ -631,37 +643,44 @@ export function VehicleMap({
           {error ?? routeError}
         </p>
       )}
-      {/* spodnji rob — samo višina */}
-      <div
-        onMouseDown={handleResizeHandleMouseDown("y")}
-        title="Povleci za spremembo višine"
-        className="absolute inset-x-0 bottom-0 z-20 flex h-3 cursor-ns-resize items-center justify-center hover:bg-black/10 dark:hover:bg-white/10"
-      >
-        <div className="h-1 w-10 rounded-full bg-gray-400/80 dark:bg-gray-300/70" />
-      </div>
-      {/* desni rob — samo širina */}
-      <div
-        onMouseDown={handleResizeHandleMouseDown("x")}
-        title="Povleci za spremembo širine"
-        className="absolute inset-y-0 right-0 z-20 flex w-3 cursor-ew-resize items-center justify-center hover:bg-black/10 dark:hover:bg-white/10"
-      >
-        <div className="h-10 w-1 rounded-full bg-gray-400/80 dark:bg-gray-300/70" />
-      </div>
-      {/* spodnji desni kot — obe hkrati (diagonalno) */}
-      <div
-        onMouseDown={handleResizeHandleMouseDown("both")}
-        title="Povleci za spremembo velikosti"
-        className="absolute bottom-0 right-0 z-20 h-4 w-4 cursor-nwse-resize"
-      >
-        <svg viewBox="0 0 16 16" className="h-full w-full text-gray-400/80 dark:text-gray-300/70">
-          <path
-            d="M14 2 L2 14 M14 7 L7 14 M14 12 L12 14"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
-      </div>
+      {/* Ročice za ročno spremembo velikosti med maximized skrijemo -- takrat zemljevid tako in
+          tako zapolni ves razpoložljiv prostor, ročno nastavljena velikost pa bi se ob naslednjem
+          odkljukanju vozila (ko maximized izklopi) vseeno takoj uveljavila. */}
+      {!maximized && (
+        <>
+          {/* spodnji rob — samo višina */}
+          <div
+            onMouseDown={handleResizeHandleMouseDown("y")}
+            title="Povleci za spremembo višine"
+            className="absolute inset-x-0 bottom-0 z-20 flex h-3 cursor-ns-resize items-center justify-center hover:bg-black/10 dark:hover:bg-white/10"
+          >
+            <div className="h-1 w-10 rounded-full bg-gray-400/80 dark:bg-gray-300/70" />
+          </div>
+          {/* desni rob — samo širina */}
+          <div
+            onMouseDown={handleResizeHandleMouseDown("x")}
+            title="Povleci za spremembo širine"
+            className="absolute inset-y-0 right-0 z-20 flex w-3 cursor-ew-resize items-center justify-center hover:bg-black/10 dark:hover:bg-white/10"
+          >
+            <div className="h-10 w-1 rounded-full bg-gray-400/80 dark:bg-gray-300/70" />
+          </div>
+          {/* spodnji desni kot — obe hkrati (diagonalno) */}
+          <div
+            onMouseDown={handleResizeHandleMouseDown("both")}
+            title="Povleci za spremembo velikosti"
+            className="absolute bottom-0 right-0 z-20 h-4 w-4 cursor-nwse-resize"
+          >
+            <svg viewBox="0 0 16 16" className="h-full w-full text-gray-400/80 dark:text-gray-300/70">
+              <path
+                d="M14 2 L2 14 M14 7 L7 14 M14 12 L12 14"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        </>
+      )}
       <style jsx global>{`
         .vehicle-marker {
           display: flex;

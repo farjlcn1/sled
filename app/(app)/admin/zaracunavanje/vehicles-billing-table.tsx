@@ -7,6 +7,7 @@ export type BillableVehicleRow = {
   id: string;
   plate: string;
   deviceImei: string | null;
+  simNumber: string | null;
   subscriptionId: string | null;
   billingEnabled: boolean;
 };
@@ -120,6 +121,7 @@ export function VehiclesBillingTable({
               </th>
               <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Registrska</th>
               <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">IMEI</th>
+              <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">SIM</th>
               <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Paket</th>
               <th className="px-3 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400">
                 Zaračunavanje
@@ -136,6 +138,7 @@ export function VehiclesBillingTable({
                   </td>
                   <td className="px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100">{v.plate}</td>
                   <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{v.deviceImei ?? "—"}</td>
+                  <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{v.simNumber ?? "—"}</td>
                   <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
                     <select
                       value={e.subscriptionId ?? ""}
@@ -168,7 +171,7 @@ export function VehiclesBillingTable({
             })}
             {vehicles.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                <td colSpan={6} className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                   To podjetje nima vozil.
                 </td>
               </tr>

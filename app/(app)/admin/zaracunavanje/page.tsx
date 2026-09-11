@@ -30,7 +30,7 @@ export default async function ZaracunavanjePage({
       prisma.vehicle.findMany({
         where: { tenantId },
         orderBy: { plate: "asc" },
-        include: { device: { select: { imei: true } } },
+        include: { device: { select: { imei: true, simNumber: true } } },
       }),
       prisma.subscription.findMany({
         where: { tenantId, status: "ACTIVE" },
@@ -48,6 +48,7 @@ export default async function ZaracunavanjePage({
       id: v.id,
       plate: v.plate,
       deviceImei: v.device?.imei ?? null,
+      simNumber: v.device?.simNumber ?? null,
       subscriptionId: v.subscriptionId,
       billingEnabled: v.billingEnabled,
     }));

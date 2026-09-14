@@ -6,9 +6,9 @@ import { EditDriverForm } from "./edit-driver-form";
 import { AssignVehicleSelect } from "./assign-vehicle-select";
 
 const ID_METHOD_LABELS: Record<string, string> = {
+  RFID_1356MHZ: "RFID 13,56 MHz",
+  RFID_125KHZ: "RFID 125 kHz",
   IBUTTON: "iButton",
-  RFID: "RFID",
-  MANUAL: "Ročno",
 };
 
 export type DriverRow = {
@@ -16,7 +16,6 @@ export type DriverRow = {
   fullName: string;
   tenantName: string;
   phone: string | null;
-  licenseNumber: string | null;
   idMethod: string;
   idCode: string | null;
   currentVehicleId: string | null;
@@ -24,7 +23,7 @@ export type DriverRow = {
 };
 
 type SortDir = "asc" | "desc";
-type ColumnKey = "fullName" | "tenantName" | "phone" | "licenseNumber" | "idMethod" | "idCode" | "vehicle";
+type ColumnKey = "fullName" | "tenantName" | "phone" | "idMethod" | "idCode" | "vehicle";
 
 function sortValue(d: DriverRow, key: ColumnKey): string {
   switch (key) {
@@ -34,8 +33,6 @@ function sortValue(d: DriverRow, key: ColumnKey): string {
       return d.tenantName;
     case "phone":
       return d.phone ?? "";
-    case "licenseNumber":
-      return d.licenseNumber ?? "";
     case "idMethod":
       return ID_METHOD_LABELS[d.idMethod] ?? d.idMethod;
     case "idCode":
@@ -69,7 +66,6 @@ export function DriversTable({
     if (showTenantColumn) base.push({ key: "tenantName", label: "Podjetje" });
     base.push(
       { key: "phone", label: "Telefon" },
-      { key: "licenseNumber", label: "Vozniško dovoljenje" },
       { key: "idMethod", label: "ID način" },
       { key: "idCode", label: "ID koda" },
       { key: "vehicle", label: "Trenutno vozilo" }
@@ -188,7 +184,6 @@ export function DriversTable({
                   <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{d.tenantName}</td>
                 )}
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{d.phone ?? "—"}</td>
-                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{d.licenseNumber ?? "—"}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{ID_METHOD_LABELS[d.idMethod]}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                   <code className="text-xs">{d.idCode ?? "—"}</code>

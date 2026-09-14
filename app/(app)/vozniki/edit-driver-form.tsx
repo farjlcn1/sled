@@ -7,7 +7,6 @@ export type EditableDriver = {
   id: string;
   fullName: string;
   phone: string | null;
-  licenseNumber: string | null;
   idMethod: string;
   idCode: string | null;
 };
@@ -43,15 +42,11 @@ export function EditDriverForm({ driver, onClose }: { driver: EditableDriver; on
             <input name="phone" defaultValue={driver.phone ?? ""} className={fieldClass()} />
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Št. vozniškega dovoljenja
-            <input name="licenseNumber" defaultValue={driver.licenseNumber ?? ""} className={fieldClass()} />
-          </label>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Način ID
             <select name="idMethod" defaultValue={driver.idMethod} className={fieldClass()}>
-              <option value="RFID">RFID</option>
+              <option value="RFID_1356MHZ">RFID 13,56 MHz</option>
+              <option value="RFID_125KHZ">RFID 125 kHz</option>
               <option value="IBUTTON">iButton</option>
-              <option value="MANUAL">Ročno</option>
             </select>
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">

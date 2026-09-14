@@ -44,22 +44,15 @@ export function AddDriverForm({ tenants }: { tenants?: { id: string; name: strin
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Št. vozniškega dovoljenja</label>
-        <input
-          name="licenseNumber"
-          className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        />
-      </div>
-      <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Način ID</label>
         <select
           name="idMethod"
-          defaultValue="RFID"
+          defaultValue="RFID_1356MHZ"
           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         >
-          <option value="RFID">RFID</option>
+          <option value="RFID_1356MHZ">RFID 13,56 MHz</option>
+          <option value="RFID_125KHZ">RFID 125 kHz</option>
           <option value="IBUTTON">iButton</option>
-          <option value="MANUAL">Ročno</option>
         </select>
       </div>
       <div>

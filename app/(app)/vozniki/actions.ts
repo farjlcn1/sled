@@ -10,8 +10,7 @@ import { parseXlsxRows, findColumn } from "@/lib/xlsx-import";
 const driverSchema = z.object({
   fullName: z.string().trim().min(1, "Vnesi ime voznika."),
   phone: z.string().optional(),
-  licenseNumber: z.string().optional(),
-  idMethod: z.enum(["IBUTTON", "RFID", "MANUAL"]).default("RFID"),
+  idMethod: z.enum(["RFID_1356MHZ", "RFID_125KHZ", "IBUTTON"]).default("RFID_1356MHZ"),
   idCode: z.string().trim().min(1, "Vnesi ID kodo."),
 });
 
@@ -34,8 +33,7 @@ export async function createDriver(_prevState: DriverState, formData: FormData):
   const parsed = driverSchema.safeParse({
     fullName: formData.get("fullName"),
     phone: formData.get("phone") || undefined,
-    licenseNumber: formData.get("licenseNumber") || undefined,
-    idMethod: formData.get("idMethod") || "RFID",
+    idMethod: formData.get("idMethod") || "RFID_1356MHZ",
     idCode: formData.get("idCode") || undefined,
   });
   if (!parsed.success) {
@@ -49,7 +47,6 @@ export async function createDriver(_prevState: DriverState, formData: FormData):
         tenantId,
         fullName: parsed.data.fullName,
         phone: parsed.data.phone,
-        licenseNumber: parsed.data.licenseNumber,
         idMethod: parsed.data.idMethod,
         idCode: parsed.data.idCode,
       },
@@ -93,8 +90,7 @@ export async function updateDriver(
   const parsed = driverSchema.safeParse({
     fullName: formData.get("fullName"),
     phone: formData.get("phone") || undefined,
-    licenseNumber: formData.get("licenseNumber") || undefined,
-    idMethod: formData.get("idMethod") || "RFID",
+    idMethod: formData.get("idMethod") || "RFID_1356MHZ",
     idCode: formData.get("idCode") || undefined,
   });
   if (!parsed.success) {
@@ -107,7 +103,6 @@ export async function updateDriver(
       data: {
         fullName: parsed.data.fullName,
         phone: parsed.data.phone || null,
-        licenseNumber: parsed.data.licenseNumber || null,
         idMethod: parsed.data.idMethod,
         idCode: parsed.data.idCode || null,
       },

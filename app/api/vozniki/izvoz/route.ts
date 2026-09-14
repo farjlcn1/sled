@@ -4,9 +4,9 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 
 const ID_METHOD_LABELS: Record<string, string> = {
+  RFID_1356MHZ: "RFID 13,56 MHz",
+  RFID_125KHZ: "RFID 125 kHz",
   IBUTTON: "iButton",
-  RFID: "RFID",
-  MANUAL: "Ročno",
 };
 
 export async function GET() {
@@ -26,7 +26,6 @@ export async function GET() {
     "Ime in priimek",
     "Podjetje",
     "Telefon",
-    "Št. vozniškega dovoljenja",
     "Način ID",
     "ID koda",
     "Trenutno vozilo",
@@ -37,7 +36,6 @@ export async function GET() {
       d.fullName,
       d.tenant.name,
       d.phone ?? "",
-      d.licenseNumber ?? "",
       ID_METHOD_LABELS[d.idMethod] ?? d.idMethod,
       d.idCode ?? "",
       d.currentVehicles[0]?.plate ?? "",

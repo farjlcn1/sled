@@ -27,7 +27,6 @@ export default async function VozNikiPage() {
     fullName: d.fullName,
     tenantName: d.tenant.name,
     phone: d.phone,
-    licenseNumber: d.licenseNumber,
     idMethod: d.idMethod,
     idCode: d.idCode,
     currentVehicleId: d.currentVehicles[0]?.id ?? null,

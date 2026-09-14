@@ -22,9 +22,9 @@ enum AuditAction {
 }
 
 enum DriverIdMethod {
+  RFID_1356MHZ
+  RFID_125KHZ
   IBUTTON
-  RFID
-  MANUAL
 }
 
 enum VehicleIconType {
@@ -296,11 +296,10 @@ model Driver {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
-  fullName      String
-  phone         String?
-  licenseNumber String?
+  fullName String
+  phone    String?
 
-  idMethod DriverIdMethod @default(RFID)
+  idMethod DriverIdMethod @default(RFID_1356MHZ)
   idCode   String? // surova iButton/RFID vrednost (po pretvorbi bajtnega vrstnega reda, kjer je potrebno)
 
   // Urnik prenosa tahografske kartice voznika — opomnik, ne samodejen prenos.

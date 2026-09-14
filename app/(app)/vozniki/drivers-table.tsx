@@ -62,12 +62,13 @@ export function DriversTable({
   canBulkDelete: boolean;
 }) {
   const columns = useMemo(() => {
-    const base: { key: ColumnKey; label: string }[] = [{ key: "fullName", label: "Ime" }];
+    const base: { key: ColumnKey; label: string }[] = [];
     if (showTenantColumn) base.push({ key: "tenantName", label: "Podjetje" });
     base.push(
-      { key: "phone", label: "Telefon" },
-      { key: "idMethod", label: "ID način" },
+      { key: "fullName", label: "Ime" },
       { key: "idCode", label: "ID koda" },
+      { key: "idMethod", label: "ID način" },
+      { key: "phone", label: "Telefon" },
       { key: "vehicle", label: "Trenutno vozilo" }
     );
     return base;
@@ -179,15 +180,15 @@ export function DriversTable({
                     <input type="checkbox" checked={checked.has(d.id)} onChange={() => toggleOne(d.id)} />
                   </td>
                 )}
-                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{d.fullName}</td>
                 {showTenantColumn && (
                   <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{d.tenantName}</td>
                 )}
-                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{d.phone ?? "—"}</td>
-                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{ID_METHOD_LABELS[d.idMethod]}</td>
+                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{d.fullName}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                   <code className="text-xs">{d.idCode ?? "—"}</code>
                 </td>
+                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{ID_METHOD_LABELS[d.idMethod]}</td>
+                <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{d.phone ?? "—"}</td>
                 <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                   {canAssignVehicle ? (
                     <AssignVehicleSelect driverId={d.id} currentVehicleId={d.currentVehicleId} vehicles={vehicles} />

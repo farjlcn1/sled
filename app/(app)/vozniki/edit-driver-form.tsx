@@ -38,8 +38,8 @@ export function EditDriverForm({ driver, onClose }: { driver: EditableDriver; on
             <input name="fullName" defaultValue={driver.fullName} required className={fieldClass()} />
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Telefon
-            <input name="phone" defaultValue={driver.phone ?? ""} className={fieldClass()} />
+            ID koda (RFID/iButton)
+            <input name="idCode" defaultValue={driver.idCode ?? ""} required placeholder="npr. RFID/iButton koda" className={fieldClass()} />
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Način ID
@@ -50,8 +50,8 @@ export function EditDriverForm({ driver, onClose }: { driver: EditableDriver; on
             </select>
           </label>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            ID koda (RFID/iButton)
-            <input name="idCode" defaultValue={driver.idCode ?? ""} required placeholder="npr. RFID/iButton koda" className={fieldClass()} />
+            Telefon
+            <input name="phone" defaultValue={driver.phone ?? ""} className={fieldClass()} />
           </label>
         </div>
 

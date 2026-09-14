@@ -37,9 +37,11 @@ export function AddDriverForm({ tenants }: { tenants?: { id: string; name: strin
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Telefon</label>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ID koda (RFID/iButton)</label>
         <input
-          name="phone"
+          name="idCode"
+          required
+          placeholder="npr. RFID/iButton koda"
           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         />
       </div>
@@ -56,11 +58,9 @@ export function AddDriverForm({ tenants }: { tenants?: { id: string; name: strin
         </select>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ID koda (RFID/iButton)</label>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Telefon</label>
         <input
-          name="idCode"
-          required
-          placeholder="npr. RFID/iButton koda"
+          name="phone"
           className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         />
       </div>

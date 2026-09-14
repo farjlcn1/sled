@@ -236,16 +236,16 @@ export async function importDriversXlsx(_prevState: ImportDriversState, formData
     const row = rows[i];
     const rowLabel = `Vrstica ${i + 2}`;
 
-    const fullName = findColumn(row, "Ime", "Ime in priimek");
     const tenantName = findColumn(row, "Podjetje");
+    const fullName = findColumn(row, "Ime", "Ime in priimek");
     const idCode = findColumn(row, "ID koda", "ID Koda", "IDkoda");
 
-    if (!fullName) {
-      errors.push(`${rowLabel}: manjka ime.`);
-      continue;
-    }
     if (!tenantName) {
       errors.push(`${rowLabel}: manjka podjetje.`);
+      continue;
+    }
+    if (!fullName) {
+      errors.push(`${rowLabel}: manjka ime.`);
       continue;
     }
     const tenantId = tenantIdByName.get(tenantName.toLowerCase());

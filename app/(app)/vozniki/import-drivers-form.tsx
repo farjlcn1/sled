@@ -17,7 +17,7 @@ export function ImportDriversForm() {
           required
           className="mt-1 block text-sm text-gray-900 dark:text-gray-100"
         />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Stolpci (poljuben vrstni red): Ime, Podjetje, ID koda</p>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Stolpci (poljuben vrstni red): Podjetje, Ime, ID koda</p>
       </div>
       <button
         type="submit"

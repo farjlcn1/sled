@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Map as MapLibreMap, Marker, Popup, LngLatBounds, setWorkerUrl } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { VehicleIcon, VehiclePosition } from "@/app/api/pozicije/route";
@@ -138,13 +138,17 @@ const HL_LINE_LAYER_PREFIX = "highlight-line-layer";
 const HL_POINTS_SOURCE_PREFIX = "highlight-points";
 const HL_POINTS_LAYER_PREFIX = "highlight-points-layer";
 
-export function VehicleMap({
-  visibleVehicleIds,
-  historyRoutes,
-  highlightPaths,
-  onDragSelect,
-  maximized,
-}: {
+export type VehicleMapHandle = {
+  // Centrira in približa živo pozicijo danega vozila (glej markersRef spodaj) -- brez učinka, če
+  // za to vozilo trenutno ni markerja (zasebni način, brez naprave ali brez sveže pozicije), kar
+  // je pričakovano stanje, ne napaka. Namenjeno mobilnemu seznamu vozil (glej app/(mobile)/), ki
+  // ob dotiku kartice vozila želi zemljevid premakniti nanj brez dodatnega pollanja pozicij v
+  // nadrejeni komponenti in brez podedovanih omejitev fitBounds (glej spodaj, maxZoom: 12 tam je
+  // bil izbran za skupine/poti, ne za en sam živ dotik enega vozila).
+  centerOnVehicle: (vehicleId: string) => void;
+};
+
+export const VehicleMap = forwardRef<VehicleMapHandle, {
   visibleVehicleIds?: Set<string>;
   historyRoutes?: HistoryRoute[];
   highlightPaths?: [number, number][][];
@@ -156,7 +160,13 @@ export function VehicleMap({
   // se po izklopu maximized zemljevid vrne natanko na velikost, kot je bila pred tem (privzeto ali
   // ročno nastavljeno prek ročic).
   maximized?: boolean;
-} = {}) {
+}>(function VehicleMap({
+  visibleVehicleIds,
+  historyRoutes,
+  highlightPaths,
+  onDragSelect,
+  maximized,
+} = {}, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const outerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -183,6 +193,19 @@ export function VehicleMap({
   const onDragSelectRef = useRef(onDragSelect);
   const selectDragRef = useRef<{ startX: number; startY: number } | null>(null);
   const selectBoxElRef = useRef<HTMLDivElement | null>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      centerOnVehicle(vehicleId: string) {
+        const map = mapRef.current;
+        const marker = markersRef.current.get(vehicleId);
+        if (!map || !marker) return;
+        map.easeTo({ center: marker.getLngLat(), zoom: 15, duration: 500 });
+      },
+    }),
+    []
+  );
 
   useEffect(() => {
     historyRoutesRef.current = historyRoutes ?? [];
@@ -725,4 +748,4 @@ export function VehicleMap({
       `}</style>
     </div>
   );
-}
+});

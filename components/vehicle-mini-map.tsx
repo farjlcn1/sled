@@ -38,7 +38,14 @@ export function VehicleMiniMap({ lat, lon, color }: { lat: number; lon: number; 
     markerElRef.current = el;
     new Marker({ element: el }).setLngLat([lon, lat]).addTo(map);
 
+    // Container se lahko poveča/zmanjša PO tem, ko je bil zemljevid že zgrajen (glej
+    // vehicle-card.tsx: velikost se izmeri prek ResizeObserverja šele po prvem izrisu, privzeto
+    // je 80px) -- MapLibre sam canvas ob tem ne preračuna, dokler se izrecno ne pokliče resize().
+    const resizeObserver = new ResizeObserver(() => map.resize());
+    resizeObserver.observe(containerRef.current);
+
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
       markerElRef.current = null;

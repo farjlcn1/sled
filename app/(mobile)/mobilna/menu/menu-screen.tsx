@@ -14,7 +14,7 @@ export function MenuScreen({
   appVersion: string;
 }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-3">
       <div>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Menu</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400">Prijavljen kot {userFullName}</p>

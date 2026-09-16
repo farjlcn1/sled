@@ -79,7 +79,7 @@ export function DomovClient({ vehicles }: { vehicles: MobileVehicle[] }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 p-3">
       <input
         type="text"
         value={search}

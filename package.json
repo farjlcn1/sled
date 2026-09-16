@@ -12,6 +12,8 @@
     "private-mode:sync": "tsx scripts/private-mode-sync.ts"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/preferences": "^8.0.1",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "@react-pdf/renderer": "^4.9.0",

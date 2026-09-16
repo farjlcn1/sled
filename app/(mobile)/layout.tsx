@@ -5,8 +5,8 @@ export default async function MobileLayout({ children }: { children: React.React
   await requireUser();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <main className="p-3 pb-[calc(4rem+env(safe-area-inset-bottom))]">{children}</main>
+    <div className="flex h-[100dvh] flex-col bg-gray-50 dark:bg-gray-900">
+      <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       <MobileBottomNav />
     </div>
   );

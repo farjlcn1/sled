@@ -32,5 +32,5 @@ export function KartaClient({ initialVehicleId }: { initialVehicleId: string | n
     };
   }, [initialVehicleId]);
 
-  return <VehicleMap ref={mapRef} maximized />;
+  return <VehicleMap ref={mapRef} maximized fillContainer />;
 }

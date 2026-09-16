@@ -159,12 +159,18 @@ export const VehicleMap = forwardRef<VehicleMapHandle, {
   // se po izklopu maximized zemljevid vrne natanko na velikost, kot je bila pred tem (privzeto ali
   // ročno nastavljeno prek ročic).
   maximized?: boolean;
+  // maximized privzeto uporabi h-[75vh] (glej spodaj), ker ga zemljevid/vehicles-panel.tsx kliče
+  // znotraj navadnega scroll-toka strani brez definirane višine prednika. Mobilni Karta zavihek pa
+  // živi znotraj flex-h-[100dvh] lupine (glej app/(mobile)/layout.tsx), kjer <main> že ima točno
+  // pravo višino -- zanj h-full namesto vh-deleža odpravi vrzel do spodnje orodne vrstice.
+  fillContainer?: boolean;
 }>(function VehicleMap({
   visibleVehicleIds,
   historyRoutes,
   highlightPaths,
   onDragSelect,
   maximized,
+  fillContainer,
 } = {}, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const outerRef = useRef<HTMLDivElement>(null);
@@ -645,7 +651,7 @@ export const VehicleMap = forwardRef<VehicleMapHandle, {
     <div
       ref={outerRef}
       className={`relative overflow-hidden rounded-md border border-gray-200 dark:border-gray-700 ${
-        effectiveHeight === null ? "h-[75vh] min-h-[520px]" : ""
+        effectiveHeight === null ? (fillContainer ? "h-full" : "h-[75vh] min-h-[520px]") : ""
       } ${effectiveWidth === null ? "w-full" : ""}`}
       style={{
         ...(effectiveHeight !== null ? { height: effectiveHeight } : undefined),

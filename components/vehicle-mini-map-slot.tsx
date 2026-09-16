@@ -12,10 +12,15 @@ export function VehicleMiniMapSlot({
   lat,
   lon,
   status,
+  size,
 }: {
   lat: number | null;
   lon: number | null;
   status: VehicleStatus;
+  // Izmerjena višina sosednje leve kolone (glej vehicle-card.tsx) -- uporabljena kot eksplicitna
+  // kvadratna stranica, ker CSS aspect-ratio + flex self-stretch ne izpelje širine zanesljivo.
+  // null pred prvo meritvijo (ResizeObserver) -- takrat uporabimo razumen privzetek.
+  size: number | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
@@ -31,8 +36,14 @@ export function VehicleMiniMapSlot({
     return () => observer.disconnect();
   }, []);
 
+  const side = size ?? 80;
+
   return (
-    <div ref={containerRef} className="h-20 w-full overflow-hidden rounded-md">
+    <div
+      ref={containerRef}
+      className="shrink-0 overflow-hidden rounded-md"
+      style={{ width: side, height: side }}
+    >
       {lat == null || lon == null ? (
         <div className="flex h-full w-full items-center justify-center bg-gray-100 text-[11px] text-gray-400 dark:bg-gray-700 dark:text-gray-500">
           Ni lokacije

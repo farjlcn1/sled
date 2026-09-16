@@ -1,8 +1,9 @@
 "use client";
 
 import { ICON_SVG } from "@/lib/vehicle-icons";
+import { VehicleMiniMapSlot } from "@/components/vehicle-mini-map-slot";
 import type { MobileVehicleStatus } from "@/app/api/vozila/status-batch/route";
-import type { MobileVehicle } from "./mobile-shell";
+import type { MobileVehicle } from "./domov-client";
 
 // Ista paleta kot zemljevid/vehicle-row.tsx (STATUS_ICON_COLOR) -- namenoma DRUGAČNA od
 // zemljevid.tsx zemljevidove palete (tam je "parked" rdeča), ker bi rdeča čez dolg seznam
@@ -87,6 +88,8 @@ export function MobileVehicleCard({
         <span>RPM: {live?.rpm ?? "—"}</span>
         <span>Obrem.: {live?.engineLoad != null ? `${live.engineLoad}%` : "—"}</span>
       </div>
+
+      <VehicleMiniMapSlot lat={live?.lat ?? null} lon={live?.lon ?? null} status={status} />
     </button>
   );
 }

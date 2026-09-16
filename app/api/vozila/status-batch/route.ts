@@ -12,6 +12,8 @@ export type MobileVehicleStatus = {
   temperature: number | null;
   rpm: number | null;
   engineLoad: number | null;
+  lat: number | null;
+  lon: number | null;
 };
 
 function num(value: unknown): number | null {
@@ -34,11 +36,13 @@ export async function GET() {
 
   const vehicles = await prisma.vehicle.findMany({
     where: vehicleWhereForUser(user),
-    select: { id: true, device: { select: { traccarDeviceId: true } } },
+    select: { id: true, isPrivateMode: true, device: { select: { traccarDeviceId: true } } },
   });
 
   const byTraccarId = new Map(
-    vehicles.filter((v) => v.device?.traccarDeviceId).map((v) => [v.device!.traccarDeviceId as number, v.id])
+    vehicles
+      .filter((v) => v.device?.traccarDeviceId)
+      .map((v) => [v.device!.traccarDeviceId as number, { vehicleId: v.id, isPrivateMode: v.isPrivateMode }])
   );
 
   const result: Record<string, MobileVehicleStatus> = {};
@@ -47,8 +51,9 @@ export async function GET() {
   const positions = await getTraccarPositions([...byTraccarId.keys()]);
 
   for (const position of positions) {
-    const vehicleId = byTraccarId.get(position.deviceId);
-    if (!vehicleId) continue;
+    const entry = byTraccarId.get(position.deviceId);
+    if (!entry) continue;
+    const { vehicleId, isPrivateMode } = entry;
     result[vehicleId] = {
       status: deriveVehicleStatus(position.attributes),
       fuel: num(position.attributes.fuel),
@@ -56,6 +61,9 @@ export async function GET() {
       temperature: temperature(position.attributes),
       rpm: num(position.attributes.rpm),
       engineLoad: num(position.attributes.engineLoad),
+      // Zasebni način: lokacija se nikoli ne izpostavi, ne glede na dostop uporabnika (glej pozicije/route.ts).
+      lat: isPrivateMode ? null : position.latitude,
+      lon: isPrivateMode ? null : position.longitude,
     };
   }
 

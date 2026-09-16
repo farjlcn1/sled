@@ -1,18 +1,15 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Map as MapLibreMap, Marker, Popup, LngLatBounds, setWorkerUrl } from "maplibre-gl";
+import { Map as MapLibreMap, Marker, Popup, LngLatBounds } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { VehicleIcon, VehiclePosition } from "@/app/api/pozicije/route";
 import type { VehicleStatus } from "@/lib/vehicle-status";
 import { ICON_SVG } from "@/lib/vehicle-icons";
 import { fetchJson } from "@/lib/fetch-json";
+import { ensureMaplibreWorker } from "@/lib/maplibre-setup";
 
-// Turbopack corrupts maplibre-gl's self-bootstrapped worker (glej next.config.ts) — uporabimo
-// ločeno CSP datoteko namesto tega. Mora biti klicano pred prvim new MapLibreMap(...).
-if (typeof window !== "undefined") {
-  setWorkerUrl("/maplibre-gl-csp-worker.js");
-}
+ensureMaplibreWorker();
 
 const POLL_INTERVAL_MS = 5000;
 const MAX_APPLY_ATTEMPTS = 100;
@@ -145,7 +142,9 @@ export type VehicleMapHandle = {
   // ob dotiku kartice vozila želi zemljevid premakniti nanj brez dodatnega pollanja pozicij v
   // nadrejeni komponenti in brez podedovanih omejitev fitBounds (glej spodaj, maxZoom: 12 tam je
   // bil izbran za skupine/poti, ne za en sam živ dotik enega vozila).
-  centerOnVehicle: (vehicleId: string) => void;
+  // Vrne true, če je bil marker najden (in kamera premaknjena), false ob no-opu -- klicatelj to
+  // uporabi za ponovni poskus, dokler poll v tej komponenti ne napolni markerja (glej app/(mobile)/).
+  centerOnVehicle: (vehicleId: string) => boolean;
 };
 
 export const VehicleMap = forwardRef<VehicleMapHandle, {
@@ -200,8 +199,9 @@ export const VehicleMap = forwardRef<VehicleMapHandle, {
       centerOnVehicle(vehicleId: string) {
         const map = mapRef.current;
         const marker = markersRef.current.get(vehicleId);
-        if (!map || !marker) return;
+        if (!map || !marker) return false;
         map.easeTo({ center: marker.getLngLat(), zoom: 15, duration: 500 });
+        return true;
       },
     }),
     []

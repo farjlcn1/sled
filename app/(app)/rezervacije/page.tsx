@@ -88,6 +88,7 @@ export default async function RezervacijePage({
             id: r.id,
             vehicleId: r.vehicleId,
             vehiclePlate: r.vehicle.plate,
+            driverId: r.driverId,
             driverName: r.driver?.fullName ?? null,
             routeName: r.routeName,
             startAt: r.startAt.toISOString(),

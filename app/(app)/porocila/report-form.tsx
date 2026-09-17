@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { REPORT_TYPE_OPTIONS } from "@/lib/report-type-options";
 import { SlovenianDateInput } from "@/components/date-input";
 
@@ -41,14 +42,25 @@ export function ReportForm({
   from?: string;
   to?: string;
 }) {
+  // Vozilo in skupina se medsebojno izključujeta -- disabled izbirnik ob oddaji obrazca svoje
+  // vrednosti sploh ne pošlje (nativno HTML obnašanje), zato to hkrati poskrbi tudi za strežniško
+  // stran brez dodatne logike v page.tsx.
+  const [vehicleId, setVehicleId] = useState(selectedVehicleId ?? "");
+  const [groupId, setGroupId] = useState(selectedGroupId ?? "");
+
   return (
     <form className="flex flex-wrap items-end gap-3 rounded-md border border-gray-200 p-4 dark:border-gray-700">
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Vozilo</label>
         <select
           name="vehicleId"
-          defaultValue={selectedVehicleId ?? ""}
-          className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          value={vehicleId}
+          disabled={!!groupId}
+          onChange={(e) => {
+            setVehicleId(e.target.value);
+            if (e.target.value) setGroupId("");
+          }}
+          className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         >
           <option value="">— brez —</option>
           <option value="__all__">— vse —</option>
@@ -63,8 +75,13 @@ export function ReportForm({
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Skupina</label>
         <select
           name="groupId"
-          defaultValue={selectedGroupId ?? ""}
-          className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          value={groupId}
+          disabled={!!vehicleId}
+          onChange={(e) => {
+            setGroupId(e.target.value);
+            if (e.target.value) setVehicleId("");
+          }}
+          className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
         >
           <option value="">— brez —</option>
           {groups.map((g) => (

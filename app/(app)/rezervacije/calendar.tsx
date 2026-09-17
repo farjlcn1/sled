@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { SlovenianDateInput } from "@/components/date-input";
-import { createReservation, deleteReservation, type ReservationState } from "./actions";
+import { createReservation, updateReservation, deleteReservation, type ReservationState } from "./actions";
 
 const PALETTE = [
   "#2563eb", "#9333ea", "#0d9488", "#db2777", "#d97706",
@@ -28,6 +28,7 @@ export type ReservationItem = {
   id: string;
   vehicleId: string;
   vehiclePlate: string;
+  driverId: string | null;
   driverName: string | null;
   routeName: string;
   startAt: string;
@@ -84,6 +85,19 @@ function localDateTimeToIso(value: string): string {
   return Number.isNaN(d.getTime()) ? "" : d.toISOString();
 }
 
+// Obratna smer od localDateTimeToIso -- za predizpolnitev SlovenianDateInput ob urejanju obstoječe
+// rezervacije (shranjeni startAt/endAt sta pravi UTC ISO, vnosno polje pa pričakuje lokalni
+// "YYYY-MM-DDTHH:mm").
+function isoToLocalDateTimeStr(iso: string): string {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day}T${hh}:${mm}`;
+}
+
 export function ReservationCalendar({
   weekStartIso,
   vehicles,
@@ -113,9 +127,40 @@ export function ReservationCalendar({
   const [state, formAction, pending] = useActionState<ReservationState, FormData>(createReservation, undefined);
   const [, startTransition] = useTransition();
 
+  // Urejanje obstoječe rezervacije (glej "selected" pojavno okno spodaj) -- editStartAtIso/EndAtIso
+  // sledita istemu vzorcu kot ustvarjalni obrazec zgoraj, samo predizpolnjena iz izbrane rezervacije.
+  const [editMode, setEditMode] = useState(false);
+  const [editStartAtIso, setEditStartAtIso] = useState("");
+  const [editEndAtIso, setEditEndAtIso] = useState("");
+  const boundUpdate = updateReservation.bind(null, selected?.id ?? "");
+  const [updateState, updateFormAction, updatePending] = useActionState<ReservationState, FormData>(
+    boundUpdate,
+    undefined
+  );
+
   useEffect(() => {
     if (state?.success) setModalOpen(false);
   }, [state]);
+
+  useEffect(() => {
+    if (updateState?.success) {
+      setSelected(null);
+      setEditMode(false);
+    }
+  }, [updateState]);
+
+  function openSelected(r: ReservationItem) {
+    setSelected(r);
+    setEditMode(false);
+    setDeleteError(null);
+  }
+
+  function openEditMode() {
+    if (!selected) return;
+    setEditStartAtIso(selected.startAt);
+    setEditEndAtIso(selected.endAt);
+    setEditMode(true);
+  }
 
   function vehicleColor(vehicleId: string) {
     const idx = vehicles.findIndex((v) => v.id === vehicleId);
@@ -256,7 +301,7 @@ export function ReservationCalendar({
                       <button
                         key={r.id}
                         type="button"
-                        onClick={() => setSelected(r)}
+                        onClick={() => openSelected(r)}
                         className="absolute overflow-hidden rounded px-1 py-0.5 text-left text-[11px] leading-tight text-white shadow-sm"
                         style={{
                           top: topHours * PX_PER_HOUR,
@@ -285,36 +330,120 @@ export function ReservationCalendar({
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-sm space-y-3 rounded-md border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-900"
           >
-            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {selected.vehiclePlate} — {selected.routeName}
-            </h3>
-            <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-              <div>Od: {fmtDateTime(selected.startAt)}</div>
-              <div>Do: {fmtDateTime(selected.endAt)}</div>
-              <div>Voznik: {selected.driverName ?? "—"}</div>
-            </div>
-            {deleteError && <p className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>}
-            <div className="flex justify-end gap-2">
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={() => handleDelete(selected.id)}
-                  className="rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 dark:border-red-800 dark:text-red-400"
-                >
-                  Izbriši
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setSelected(null);
-                  setDeleteError(null);
-                }}
-                className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
-              >
-                Zapri
-              </button>
-            </div>
+            {editMode ? (
+              // key={selected.id} prisili remount SlovenianDateInput (njegovo notranje stanje se
+              // sicer inicializira samo ob prvem mountu -- glej potni-nalogi/complete-dialog.tsx
+              // za isti vzorec), da vsaka drugače izbrana rezervacija dobi svežo predizpolnitev.
+              <form key={selected.id} action={updateFormAction} className="space-y-3">
+                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Uredi rezervacijo</h3>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Vozilo
+                  <select name="vehicleId" required defaultValue={selected.vehicleId} className={fieldClass()}>
+                    {vehicles.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.plate}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Voznik (neobvezno)
+                  <select name="driverId" defaultValue={selected.driverId ?? ""} className={fieldClass()}>
+                    <option value="">— brez voznika —</option>
+                    {drivers.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Ime poti
+                  <input name="routeName" required defaultValue={selected.routeName} className={fieldClass()} />
+                </label>
+                <input type="hidden" name="startAt" value={editStartAtIso} />
+                <input type="hidden" name="endAt" value={editEndAtIso} />
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Od
+                    <SlovenianDateInput
+                      withTime
+                      required
+                      defaultValue={isoToLocalDateTimeStr(selected.startAt)}
+                      onValueChange={(v) => setEditStartAtIso(localDateTimeToIso(v))}
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Do
+                    <SlovenianDateInput
+                      withTime
+                      required
+                      defaultValue={isoToLocalDateTimeStr(selected.endAt)}
+                      onValueChange={(v) => setEditEndAtIso(localDateTimeToIso(v))}
+                    />
+                  </label>
+                </div>
+                {updateState?.error && <p className="text-sm text-red-600 dark:text-red-400">{updateState.error}</p>}
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditMode(false)}
+                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                  >
+                    Prekliči
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updatePending}
+                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    {updatePending ? "Shranjujem …" : "Shrani"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {selected.vehiclePlate} — {selected.routeName}
+                </h3>
+                <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                  <div>Od: {fmtDateTime(selected.startAt)}</div>
+                  <div>Do: {fmtDateTime(selected.endAt)}</div>
+                  <div>Voznik: {selected.driverName ?? "—"}</div>
+                </div>
+                {deleteError && <p className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>}
+                <div className="flex justify-end gap-2">
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(selected.id)}
+                      className="rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 dark:border-red-800 dark:text-red-400"
+                    >
+                      Izbriši
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={openEditMode}
+                      className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300"
+                    >
+                      Uredi
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelected(null);
+                      setDeleteError(null);
+                    }}
+                    className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white"
+                  >
+                    Zapri
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

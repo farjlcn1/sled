@@ -88,6 +88,94 @@ export async function createReservation(_prevState: ReservationState, formData: 
   return { success: true };
 }
 
+export async function updateReservation(
+  reservationId: string,
+  _prevState: ReservationState,
+  formData: FormData
+): Promise<ReservationState> {
+  const user = await requireUser();
+  if (!user.canManageVehicles && !user.canManagePlatform) {
+    return { error: "Nimaš dovoljenja za rezervacijo vozil." };
+  }
+
+  const existing = await prisma.vehicleReservation.findUnique({ where: { id: reservationId } });
+  if (!existing) return { error: "Rezervacija ne obstaja." };
+  if (!user.canManagePlatform && existing.tenantId !== user.tenantId) {
+    return { error: "Ni dovoljeno." };
+  }
+
+  const parsed = reservationSchema.safeParse({
+    vehicleId: formData.get("vehicleId"),
+    driverId: formData.get("driverId") || undefined,
+    routeName: formData.get("routeName"),
+    startAt: formData.get("startAt"),
+    endAt: formData.get("endAt"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
+  }
+
+  const startAt = new Date(parsed.data.startAt);
+  const endAt = new Date(parsed.data.endAt);
+  if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+    return { error: "Neveljaven datum/čas." };
+  }
+  if (endAt <= startAt) {
+    return { error: "Konec rezervacije mora biti po začetku." };
+  }
+
+  const vehicle = await prisma.vehicle.findUnique({ where: { id: parsed.data.vehicleId } });
+  if (!vehicle) return { error: "Vozilo ne obstaja." };
+  if (!user.canManagePlatform && vehicle.tenantId !== user.tenantId) {
+    return { error: "Ni dovoljeno." };
+  }
+
+  if (parsed.data.driverId) {
+    const driver = await prisma.driver.findUnique({ where: { id: parsed.data.driverId } });
+    if (!driver || driver.tenantId !== vehicle.tenantId) {
+      return { error: "Izbrani voznik ni na voljo za to podjetje." };
+    }
+  }
+
+  // Enaka prekrivalna preverba kot createReservation, le da izključi lastni zapis -- sicer bi
+  // rezervacija vedno "trčila" sama vase.
+  const overlap = await prisma.vehicleReservation.findFirst({
+    where: {
+      id: { not: reservationId },
+      vehicleId: parsed.data.vehicleId,
+      startAt: { lt: endAt },
+      endAt: { gt: startAt },
+    },
+  });
+  if (overlap) {
+    return { error: `Vozilo ${vehicle.plate} je v tem času že rezervirano (${overlap.routeName}).` };
+  }
+
+  await prisma.vehicleReservation.update({
+    where: { id: reservationId },
+    data: {
+      vehicleId: parsed.data.vehicleId,
+      driverId: parsed.data.driverId || null,
+      routeName: parsed.data.routeName,
+      startAt,
+      endAt,
+    },
+  });
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId: existing.tenantId,
+    action: "UPDATE",
+    entityType: "VehicleReservation",
+    entityId: reservationId,
+    entityLabel: `${vehicle.plate} — ${parsed.data.routeName}`,
+  });
+
+  revalidatePath("/rezervacije");
+  return { success: true };
+}
+
 export async function deleteReservation(reservationId: string): Promise<{ error?: string } | undefined> {
   const user = await requireUser();
 

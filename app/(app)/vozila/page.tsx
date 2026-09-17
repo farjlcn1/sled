@@ -69,6 +69,7 @@ export default async function VozilaPage({
     nextServiceKm: v.nextServiceKm,
     driverName: v.currentDriver?.fullName ?? null,
     groupNames: v.groupMemberships.map((m) => m.group.name),
+    groupIds: v.groupMemberships.map((m) => m.groupId),
     din1Label: v.din1Label,
     din2Label: v.din2Label,
     din3Label: v.din3Label,
@@ -129,7 +130,12 @@ export default async function VozilaPage({
             </a>
           </div>
 
-          <VehiclesTable vehicles={vehicleRows} availableDevices={availableDevices} canBulkDelete={user.canManagePlatform} />
+          <VehiclesTable
+            vehicles={vehicleRows}
+            availableDevices={availableDevices}
+            groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+            canBulkDelete={user.canManagePlatform}
+          />
         </section>
       )}
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { updateVehicle, archiveVehicle, startPrivateMode, endPrivateMode } from "../actions";
+import { updateVehicle, archiveVehicle, startPrivateMode, endPrivateMode, saveGroupMemberships } from "../actions";
 import { SlovenianDateInput } from "@/components/date-input";
 
 const ICON_OPTIONS: { value: string; label: string }[] = [
@@ -57,16 +57,53 @@ function fieldClass() {
 export function EditVehicleSection({
   vehicle,
   availableDevices,
+  groups,
+  vehicleGroupIds,
   onClose,
 }: {
   vehicle: EditableVehicle;
   availableDevices: { id: string; imei: string; protocol: string; brand: string | null; model: string | null }[];
+  groups: { id: string; name: string }[];
+  vehicleGroupIds: string[];
   onClose?: () => void;
 }) {
   const boundUpdate = updateVehicle.bind(null, vehicle.id);
   const [state, formAction, pending] = useActionState(boundUpdate, undefined);
   const [archiving, startArchiving] = useTransition();
   const [archiveError, setArchiveError] = useState<string | null>(null);
+
+  // Enak "izbrano ob kliku Shrani" vzorec kot desktop GroupsMatrix (skupine/groups-matrix.tsx) in
+  // mobilni /mobilna/vozila/[id] urejevalnik -- baseline se posodobi šele po uspešnem shranjevanju,
+  // dirtyGroupIds primerja živo stanje proti temu, kar dejansko obstaja v bazi.
+  const initialMembership = () => Object.fromEntries(groups.map((g) => [g.id, vehicleGroupIds.includes(g.id)]));
+  const [groupBaseline, setGroupBaseline] = useState<Record<string, boolean>>(initialMembership);
+  const [groupMembership, setGroupMembership] = useState<Record<string, boolean>>(initialMembership);
+  const [groupsPending, startGroupsTransition] = useTransition();
+  const [groupsError, setGroupsError] = useState<string | null>(null);
+  const [groupsSuccess, setGroupsSuccess] = useState(false);
+
+  const dirtyGroupIds = groups.map((g) => g.id).filter((id) => groupMembership[id] !== groupBaseline[id]);
+  const groupsDirty = dirtyGroupIds.length > 0;
+
+  function toggleGroup(groupId: string) {
+    setGroupsSuccess(false);
+    setGroupMembership((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
+  }
+
+  function handleSaveGroups() {
+    setGroupsError(null);
+    setGroupsSuccess(false);
+    const changes = dirtyGroupIds.map((groupId) => ({ groupId, vehicleId: vehicle.id, inGroup: groupMembership[groupId] }));
+    startGroupsTransition(async () => {
+      const result = await saveGroupMemberships(changes);
+      if (result?.error) {
+        setGroupsError(result.error);
+      } else {
+        setGroupBaseline(groupMembership);
+        setGroupsSuccess(true);
+      }
+    });
+  }
 
   // Ločeno od "Shrani" -- ima takojšen učinek (odpre/zapre VehiclePrivacyPeriod), zato deluje kot
   // samostojno stikalo (brez name atributa, torej ga glavni submit ignorira), ne kot del
@@ -248,6 +285,34 @@ export function EditVehicleSection({
           Če je izbran DIN, ga redna samodejna sinhronizacija upošteva kot vir resnice in lahko prepiše zgornjo ročno kljukico.
         </p>
         {privacyError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{privacyError}</p>}
+      </div>
+
+      <div className="border-t border-gray-200 pt-3 dark:border-gray-700">
+        <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">Skupine</span>
+        {groups.length === 0 ? (
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Ni skupin.</p>
+        ) : (
+          <div className="mt-1 grid grid-cols-2 gap-1">
+            {groups.map((g) => (
+              <label key={g.id} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input type="checkbox" checked={groupMembership[g.id] ?? false} onChange={() => toggleGroup(g.id)} />
+                {g.name}
+              </label>
+            ))}
+          </div>
+        )}
+        {groups.length > 0 && (
+          <button
+            type="button"
+            onClick={handleSaveGroups}
+            disabled={!groupsDirty || groupsPending}
+            className="mt-2 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {groupsPending ? "Shranjujem …" : "Shrani spremembe skupin"}
+          </button>
+        )}
+        {groupsError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{groupsError}</p>}
+        {groupsSuccess && <p className="mt-1 text-sm text-green-600 dark:text-green-400">Shranjeno.</p>}
       </div>
 
       {(state?.error || archiveError) && (

@@ -123,18 +123,16 @@ export function AddVehicleForm({
         </select>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Skupina</label>
-        <select
-          name="groupId"
-          className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-        >
-          <option value="">— brez skupine —</option>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Skupine</label>
+        <div className="mt-1 flex max-h-28 w-48 flex-col gap-1 overflow-y-auto rounded-md border border-gray-300 p-2 dark:border-gray-600">
+          {groups.length === 0 && <span className="text-sm text-gray-400 dark:text-gray-500">Ni skupin.</span>}
           {groups.map((g) => (
-            <option key={g.id} value={g.id}>
+            <label key={g.id} className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
+              <input type="checkbox" name="groupIds" value={g.id} className="h-4 w-4" />
               {g.name}
-            </option>
+            </label>
           ))}
-        </select>
+        </div>
       </div>
       <div className="w-full">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Komentar</label>

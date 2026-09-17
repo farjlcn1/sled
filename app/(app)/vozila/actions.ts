@@ -24,7 +24,6 @@ const vehicleSchema = z.object({
   nextServiceDate: z.string().optional(),
   nextServiceKm: z.coerce.number().optional(),
   deviceId: z.string().optional(),
-  groupId: z.string().optional(),
   tenantId: z.string().optional(),
   din1Label: z.string().optional(),
   din2Label: z.string().optional(),
@@ -55,12 +54,12 @@ export async function createVehicle(_prevState: VehicleState, formData: FormData
     nextServiceDate: formData.get("nextServiceDate") || undefined,
     nextServiceKm: formData.get("nextServiceKm") || undefined,
     deviceId: formData.get("deviceId") || undefined,
-    groupId: formData.get("groupId") || undefined,
     tenantId: formData.get("tenantId") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Neveljavni podatki." };
   }
+  const groupIds = formData.getAll("groupIds").map(String).filter(Boolean);
 
   let tenantId: string;
   if (user.tenantId) {
@@ -86,10 +85,10 @@ export async function createVehicle(_prevState: VehicleState, formData: FormData
     }
   }
 
-  if (parsed.data.groupId) {
-    const group = await prisma.vehicleGroup.findUnique({ where: { id: parsed.data.groupId } });
-    if (!group || group.tenantId !== tenantId) {
-      return { error: "Izbrana skupina ni na voljo za to podjetje." };
+  if (groupIds.length > 0) {
+    const validGroups = await prisma.vehicleGroup.findMany({ where: { id: { in: groupIds }, tenantId } });
+    if (validGroups.length !== groupIds.length) {
+      return { error: "Ena ali več izbranih skupin ni na voljo za to podjetje." };
     }
   }
 
@@ -110,8 +109,10 @@ export async function createVehicle(_prevState: VehicleState, formData: FormData
     },
   });
 
-  if (parsed.data.groupId) {
-    await prisma.vehicleGroupMembership.create({ data: { vehicleId: vehicle.id, groupId: parsed.data.groupId } });
+  if (groupIds.length > 0) {
+    await prisma.vehicleGroupMembership.createMany({
+      data: groupIds.map((groupId) => ({ vehicleId: vehicle.id, groupId })),
+    });
   }
 
   await logAudit({
@@ -405,6 +406,9 @@ export async function saveGroupMemberships(
   revalidatePath("/vozila");
   revalidatePath("/uporabniki");
   revalidatePath("/skupine");
+  for (const vehicleId of new Set(changes.map((c) => c.vehicleId))) {
+    revalidatePath(`/vozila/${vehicleId}`);
+  }
 }
 
 export async function createVehicleGroup(_prevState: VehicleState, formData: FormData): Promise<VehicleState> {

@@ -9,10 +9,14 @@ export type { EditableVehicle };
 export function EditVehicleForm({
   vehicle,
   availableDevices,
+  groups,
+  vehicleGroupIds,
   onClose,
 }: {
   vehicle: EditableVehicle;
   availableDevices: { id: string; imei: string; protocol: string; brand: string | null; model: string | null }[];
+  groups: { id: string; name: string }[];
+  vehicleGroupIds: string[];
   onClose: () => void;
 }) {
   return (
@@ -22,7 +26,13 @@ export function EditVehicleForm({
         className="w-full max-w-lg rounded-md border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-900"
       >
         <h3 className="mb-3 text-sm font-medium text-gray-900 dark:text-gray-100">Uredi vozilo — {vehicle.plate}</h3>
-        <EditVehicleSection vehicle={vehicle} availableDevices={availableDevices} onClose={onClose} />
+        <EditVehicleSection
+          vehicle={vehicle}
+          availableDevices={availableDevices}
+          groups={groups}
+          vehicleGroupIds={vehicleGroupIds}
+          onClose={onClose}
+        />
       </div>
     </div>
   );

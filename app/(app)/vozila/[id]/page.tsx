@@ -65,9 +65,17 @@ export default async function VoziloDetailPage({ params }: { params: Promise<{ i
 
   const vehicle = await prisma.vehicle.findFirst({
     where: { id, ...vehicleWhereForUser(user) },
-    include: { currentDriver: true, device: true },
+    include: { currentDriver: true, device: true, groupMemberships: { select: { groupId: true } } },
   });
   if (!vehicle) notFound();
+
+  // isArchiveGroup izključen -- ista utemeljitev kot vozila/page.tsx in skupine/page.tsx: ta
+  // skupina ni izbirljiva prek generičnega izbirnika skupine, doseže se je samo prek "Arhiviraj".
+  const groups = await prisma.vehicleGroup.findMany({
+    where: { tenantId: vehicle.tenantId, isArchiveGroup: false },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
 
   // Enako kot na seznamu vozil (vozila/page.tsx): proste naprave + trenutno dodeljena (ta sicer
   // ne bi bila med "prostimi", pa mora ostati izbirljiva, da ostane izbrana, če je ne spremenimo).
@@ -169,6 +177,8 @@ export default async function VoziloDetailPage({ params }: { params: Promise<{ i
             isPrivateMode: vehicle.isPrivateMode,
           }}
           availableDevices={availableDevices}
+          groups={groups}
+          vehicleGroupIds={vehicle.groupMemberships.map((m) => m.groupId)}
         />
       </section>
 

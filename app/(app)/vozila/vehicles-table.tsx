@@ -32,6 +32,7 @@ export type VehicleRow = {
   nextServiceKm: number | null;
   driverName: string | null;
   groupNames: string[];
+  groupIds: string[];
   din1Label: string | null;
   din2Label: string | null;
   din3Label: string | null;
@@ -90,10 +91,12 @@ export type AvailableDevice = { id: string; imei: string; protocol: string; bran
 export function VehiclesTable({
   vehicles,
   availableDevices,
+  groups,
   canBulkDelete,
 }: {
   vehicles: VehicleRow[];
   availableDevices: AvailableDevice[];
+  groups: { id: string; name: string }[];
   canBulkDelete: boolean;
 }) {
   const [sort, setSort] = useState<{ key: ColumnKey; dir: SortDir } | null>(null);
@@ -262,6 +265,8 @@ export function VehiclesTable({
         <EditVehicleForm
           vehicle={editingVehicle}
           availableDevices={editingDeviceOptions}
+          groups={groups}
+          vehicleGroupIds={editingVehicle.groupIds}
           onClose={() => setEditingId(null)}
         />
       )}

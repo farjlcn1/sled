@@ -22,6 +22,18 @@ function MapPinIcon() {
   );
 }
 
+function WrenchIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
+      <path
+        d="M13.5 4.5a3 3 0 0 0-3.9 3.9L4 14v2h2l5.6-5.6a3 3 0 0 0 3.9-3.9l-2.1 2.1-1.9-1.9Z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function MenuIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
@@ -30,19 +42,24 @@ function MenuIcon() {
   );
 }
 
-const TABS = [
-  { href: "/mobilna", label: "Domov", Icon: HomeIcon },
-  { href: "/mobilna/karta", label: "Karta", Icon: MapPinIcon },
-  { href: "/mobilna/menu", label: "Menu", Icon: MenuIcon },
+const ALL_TABS = [
+  { href: "/mobilna", label: "Domov", Icon: HomeIcon, requiresVehicleManage: false },
+  { href: "/mobilna/karta", label: "Karta", Icon: MapPinIcon, requiresVehicleManage: false },
+  { href: "/mobilna/vozila", label: "Vozila", Icon: WrenchIcon, requiresVehicleManage: true },
+  { href: "/mobilna/menu", label: "Menu", Icon: MenuIcon, requiresVehicleManage: false },
 ];
 
-export function MobileBottomNav() {
+export function MobileBottomNav({ canManageVehicles }: { canManageVehicles: boolean }) {
   const pathname = usePathname();
+  const tabs = ALL_TABS.filter((t) => !t.requiresVehicleManage || canManageVehicles);
 
   return (
     <nav className="flex shrink-0 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-gray-700 dark:bg-gray-800">
-      {TABS.map(({ href, label, Icon }) => {
-        const isActive = pathname === href;
+      {tabs.map(({ href, label, Icon }) => {
+        // Domov (koren "/mobilna") namerno samo natančno ujemanje -- sicer bi zaradi
+        // startsWith("/mobilna/") svetil hkrati z vsakim drugim zavihkom. Ostali zavihki (npr.
+        // Vozila -> /mobilna/vozila/[id]) smejo ujemati tudi svoje podstrani.
+        const isActive = pathname === href || (href !== "/mobilna" && pathname.startsWith(`${href}/`));
         return (
           <Link
             key={href}

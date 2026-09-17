@@ -222,6 +222,57 @@ export async function updateVehicle(
   return { success: true };
 }
 
+export type UpdatePlateState = { error?: string; success?: boolean } | undefined;
+
+// Ozek popravek samo registrske -- za mobilni zavihek Vozila, ki namerno ne izpostavlja celotnega
+// vehicleSchema (znamka/model/servis/DIN itd.). Ne uporablja updateVehicle, ker bi manjkajoča
+// polja v FormData tam tiho počistila obstoječe vrednosti (icon celo pade nazaj na "CAR" prek
+// .default()), ne pa jih pustila nedotaknjene.
+export async function updateVehiclePlate(
+  vehicleId: string,
+  _prevState: UpdatePlateState,
+  formData: FormData
+): Promise<UpdatePlateState> {
+  const user = await requireUser();
+  if (!user.canManageVehicles && !user.canManagePlatform) {
+    return { error: "Nimaš dovoljenja za urejanje vozil." };
+  }
+
+  const existing = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+  if (!existing) return { error: "Vozilo ne obstaja." };
+  if (!user.canManagePlatform && existing.tenantId !== user.tenantId) {
+    return { error: "Ni dovoljeno." };
+  }
+
+  const trimmed = String(formData.get("plate") ?? "").trim();
+  if (!trimmed) return { error: "Vnesi registrsko številko." };
+
+  try {
+    await prisma.vehicle.update({ where: { id: vehicleId }, data: { plate: trimmed } });
+  } catch {
+    return { error: "Napaka pri shranjevanju — ta registrska št. je že v uporabi." };
+  }
+
+  await logAudit({
+    userId: user.id,
+    userEmail: user.email,
+    tenantId: user.tenantId,
+    action: "UPDATE",
+    entityType: "Vehicle",
+    entityId: vehicleId,
+    entityLabel: trimmed,
+    changes: { plate: { from: existing.plate, to: trimmed } },
+  });
+
+  revalidatePath("/vozila");
+  revalidatePath(`/vozila/${vehicleId}`);
+  revalidatePath("/zemljevid");
+  revalidatePath("/mobilna");
+  revalidatePath("/mobilna/vozila");
+  revalidatePath(`/mobilna/vozila/${vehicleId}`);
+  return { success: true };
+}
+
 export type ArchiveVehicleState = { error?: string; success?: boolean } | undefined;
 
 // Odveže sledilno napravo od vozila in vozilo doda v arhivsko skupino tega najemnika (glej

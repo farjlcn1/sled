@@ -1,0 +1,74 @@
+This one's substantially more complex than teren — TimescaleDB, Traccar (GPS ingestion), a self-hosted geocoder, and a host-level SMS gateway tied to physical hardware. Let me check the remaining pieces before writing accurate steps.
+
+Ran 2 commands
+
+Sled has a lot more moving parts than teren — TimescaleDB with two databases, GPS ingestion via Traccar, a self-hosted geocoder, and physical SMS hardware. Here's the accurate breakdown, based on the real config:
+
+What's involved (more than teren)
+Piece	What it is	Migration weight
+App + Postgres/TimescaleDB	Web app, two DBs on one instance (sledenje, traccar)	Required
+traccar service	GPS device ingestion (port 5027 raw TCP)	Required
+photon service	Self-hosted Slovenia geocoder — its index takes a long time to (re)build	Required, but copy the volume, don't rebuild
+SIM7600E modem + gateway	Physical USB modem for sending SMS	Only if you use SMS features — needs the physical modem moved
+Mail relay (Postfix)	Shared with teren, on host.docker.internal	Decision: keep pointing at this machine, or migrate too
+gps.farjolcn.com DDNS	Separate from the app's domain — direct port-forward + Cloudflare A-record update, not a tunnel	Required if GPS devices need to keep reporting
+Private-mode / billing timers	Periodic background jobs	Only if you use those features
+Phase 1 — On this machine: dump data
+docker compose --project-directory /home/matija/farjolcn/sled exec -T postgres pg_dump -U sledenje sledenje > sledenje-db.sql
+docker compose --project-directory /home/matija/farjolcn/sled exec -T postgres pg_dump -U sledenje traccar > traccar-db.sql
+docker run --rm -v sled_photon_data:/data -v "$PWD":/backup alpine tar czf /backup/photon_data.tar.gz -C /data .
+
+(the geocoder index — copying this saves you a long rebuild; check the actual volume name first with docker volume ls)
+
+Copy sledenje-db.sql, traccar-db.sql, photon_data.tar.gz, and .env + .env.production to the new machine.
+
+Phase 2 — Physically move the modem (only if you use SMS)
+
+Unplug the SIM7600E-L1C from this machine's USB and plug it into the new one. Nothing runs SMS on both machines at once.
+
+Phase 3 — New machine prerequisites
+sudo apt update && sudo apt install -y docker.io docker-compose-plugin git modemmanager python3
+Phase 4 — Clone and restore
+git clone git@github.com:farjlcn1/sled.git
+cp .env .env.production sled/
+docker compose --project-directory sled up -d postgres
+cat sledenje-db.sql | docker compose --project-directory sled exec -T postgres psql -U sledenje -d sledenje
+cat traccar-db.sql | docker compose --project-directory sled exec -T postgres psql -U sledenje -d traccar
+
+Restore photon_data.tar.gz into the new photon_data volume the same way it was dumped (reverse of the tar czf command above, using tar xzf).
+
+Phase 5 — Update .env.production for the new domain
+NEXT_PUBLIC_APP_URL="https://your-new-sledenje-domain.com"
+
+TRACCAR_API_URL stays http://traccar:8082 (internal Docker network name, doesn't change).
+
+Phase 6 — SMS gateway (only if used)
+sudo mkdir -p /opt/sledenje-sms-gateway
+
+Copy deploy/sms-gateway/gateway.py there, then:
+
+sudo cp deploy/sms-gateway/sledenje-sms-gateway.service /etc/systemd/system/
+sudo systemctl enable --now sledenje-sms-gateway.service
+
+Confirm the modem is claimed: mmcli -L
+
+Phase 7 — Bring everything up
+docker compose --project-directory sled up -d --build
+
+Photon's first boot is slow unless you restored its volume in Phase 4 — if you skipped that, expect a long wait while it rebuilds the Slovenia index.
+
+Phase 8 — Cloudflare Tunnel for the web app domain
+
+Same pattern as teren: cloudflared tunnel create, route dns, config pointing at localhost:3002 (sled's app port).
+
+Phase 9 — GPS ingestion domain (gps.farjolcn.com-equivalent)
+
+This is not a tunnel — it's a direct exposure:
+
+Port-forward TCP 5027 on the new machine's router/firewall
+sudo mkdir -p /etc/sledenje-ddns and put the Cloudflare API token at /etc/sledenje-ddns/cloudflare-token
+Copy deploy/ddns/ddns-update.py to /opt/sledenje-ddns/
+Install and enable sledenje-ddns.service + .timer from deploy/ddns/
+Phase 10 — Private-mode / billing timers (only if used)
+
+Same pattern — copy the script to /opt/..., install the .service + .timer pair from deploy/private-mode/ or deploy/billing/, systemctl enable --now the timer.
